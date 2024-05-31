@@ -1,0 +1,34 @@
+{
+  "printWidth": 120,
+  "overrides": [
+    {
+      "files": "*.{tsx,ts,json,js,css}",
+      "options": {
+        "tabWidth": 2,
+        "useTabs": false,
+        "singleQuote": true,
+        "bracketSpacing": true
+      }
+    },
+    {
+      "files": "*.sol",
+      "options": {
+        "tabWidth": 2,
+        "useTabs": false,
+        "singleQuote": false,
+        "bracketSpacing": true,
+        "explicitTypes": "preserve"
+      }
+    },
+    {
+      "files": "*.test.mjs",
+      "options": {
+        "tabWidth": 2,
+        "useTabs": false,
+        "singleQuote": false,
+        "bracketSpacing": true,
+        "explicitTypes": "preserve"
+      }
+    }
+  ]
+}
