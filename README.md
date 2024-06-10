@@ -52,9 +52,9 @@ To run tests using Hardhat, follow these steps:
 
 1. Run the test cases:
 
-   ```bash
-  npx hardhat test
-   ```
+```bash
+npx hardhat test
+```
 
 ## License
 
