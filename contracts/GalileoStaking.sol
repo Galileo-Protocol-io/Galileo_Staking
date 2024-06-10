@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./lib/Category.sol";
 import "hardhat/console.sol";
 
+// ═══════════════════════ ERORRS ════════════════════════
+
 // Error indicating an invalid address for a collection
 error InvalidAddress(address collectionAddress);
 
@@ -34,6 +36,8 @@ error InvalidTokenId();
 error TokenAlreadyStaked();
 
 contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
+  // ═══════════════════════ VARIABLES ════════════════════════
+
   // Constant variable defining the ADMIN_ROLE using keccak256 hash
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -46,6 +50,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
   // Constant for increment value
   uint256 private constant increment = 200e18; // 200 * 10^18
+
+  // ═══════════════════════ STRUCTS ════════════════════════
 
   // Struct to store information about a stake per category
   struct StakePerCategory {
@@ -93,11 +99,10 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     RewardWindow[] rewardWindows; // Array of reward windows for the pool
   }
 
+  // ═══════════════════════ MAPPINGS ════════════════════════
+
   // Mapping to store PoolData for each collection address
   mapping(address => PoolData) private pools;
-
-  // Mapping to store the category of each collection
-  mapping(address => uint256) public collectionToCategory;
 
   // Mapping to store stakers' positions by collection, staker address, and category
   mapping(address => mapping(address => mapping(uint256 => StakePerCategory))) stakersPosition;
@@ -108,11 +113,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   // Mapping to store staking boost multipliers for each collection
   mapping(address => Multiplier[]) public stakingBoostPerCollection;
 
-  // Mapping to store the number of categories for each collection
-  mapping(address => uint256) public categoriesPerCollection;
-
-  // Mapping to store the category associated with each NFT
-  mapping(uint256 => uint256) public categoryPerNFT;
+  // ═══════════════════════ EVENTS ════════════════════════
 
   // Event emitted when a collection is configured with its address and total number of categories
   event ConfigureCollection(address collectionAddress, uint256 totalCategories);
@@ -129,6 +130,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
   // Event emitted when multipliers are set for a collection
   event MultipliersSet(address collectionAddress, Multiplier[] multipliers);
+
+  // ═══════════════════════ CONSTRUCTOR ════════════════════════
 
   /**
    * @dev Constructor to initialize the contract.
@@ -148,6 +151,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     // Set the LEOX token address
     LEOX = _leox;
   }
+
+  // ═══════════════════════ FUNCTIONS ════════════════════════
 
   /**
    * @dev Function to stake tokens.
@@ -387,6 +392,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    * @param collectionAddress The address of the collection contract.
    * @param _LeoxInfo An array of StakeInfo structs containing information about LEOX tokens.
    */
+  // [[[1,2,3,4,5,6,7,8,9],5000000000000000000000,5],[[10,11,12,13,14,15,17,18,19,20],4000000000000000000000,4]]
   function configureCollection(address collectionAddress, StakeInfo[] calldata _LeoxInfo) public onlyRole(ADMIN_ROLE) {
     // Get the name of the collection using the ERC721 interface
     string memory collectionName = ERC721(collectionAddress).name();
@@ -397,9 +403,6 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
       leoxInfoByCategory[collectionAddress].push(
         StakeInfo(_LeoxInfo[i].tokenIds, _LeoxInfo[i].maxLeox, _LeoxInfo[i].yieldTraitPoints, collectionName)
       );
-
-      // Set the number of categories per collection
-      categoriesPerCollection[collectionAddress] = _LeoxInfo.length;
     }
 
     // Emit an event to signify the successful configuration of the collection
@@ -410,7 +413,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    * @dev Function to set staking multipliers for a collection.
    *
    * @param collectionAddress The address of the collection contract.
-   * @param multipliers An array of Multiplier structs containing staking time and boost information.
+   * @param multipliers An array of Multiplier structs containing staking time and boost information. [[6000,1500000000000000000]]
    */
   function setMultipliers(address collectionAddress, Multiplier[] calldata multipliers) public onlyRole(ADMIN_ROLE) {
     // Check if the collection address is valid
@@ -481,6 +484,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    *
    * @param _inputs An array of PoolConfigurationInput structs containing pool configuration information.
    */
+  // [["0xd7Ca4e99F7C171B9ea2De80d3363c47009afaC5F",3000000000000000000,[[12,2500]]]]
   function configurePool(PoolConfigurationInput[] memory _inputs) public onlyRole(ADMIN_ROLE) {
     // Iterate through each input in the array
     for (uint256 i; i < _inputs.length; ) {
