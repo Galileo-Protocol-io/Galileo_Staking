@@ -309,7 +309,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   /**
    * @dev configureCollection function to configure collection address
    * @param collectionAddress : collection address of NFT address
-   * @param _LeoxInfo : token id of the collection
+   * @param _LeoxInfo : token id of the collection 
+   // [[[1,2,3,4,5,6,7,8,9],5000000000000000000000,5],[[10,11,12,13,14,15,17,18,19,20],4000000000000000000000,4]]
    */
   function configureCollection(address collectionAddress, LeoxInfo[] calldata _LeoxInfo) public onlyRole(ADMIN_ROLE) {
     string memory collectionName = ERC721(collectionAddress).name();
@@ -335,7 +336,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   /**
    * @dev setMultipliers function set the multipliers by the admin
    * @param collectionId : collection id of NFT address
-   * @param multipliers : staking time and staking boost
+   * @param multipliers : staking time and staking boost [[6000,1500000000000000000]]
    */
   function setMultipliers(uint256 collectionId, Multiplier[] calldata multipliers) public onlyRole(ADMIN_ROLE) {
     address collectionAddress = getCollectionAddressById(collectionId);
@@ -438,7 +439,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
   /**
    * @dev configurePool function to get information of staked LEOX
-   * @param _inputs : configure the pool for staking
+   * @param _inputs : configure the pool for staking [[1,3000000000000000000,[[12,2500]]]]
    */
   function configurePool(PoolConfigurationInput[] memory _inputs) public onlyRole(ADMIN_ROLE) {
     for (uint256 i; i < _inputs.length; ) {
