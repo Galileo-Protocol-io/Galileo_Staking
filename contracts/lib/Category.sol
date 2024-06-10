@@ -14,24 +14,24 @@ contract Category {
   }
 
   function configureNFTsWithTokenIds(
-    address _collectionAddress,
+    address collectionAddress,
     uint256[] calldata tokenIds,
     uint256 category
   ) internal {
     for (uint256 i = 0; i < tokenIds.length; i++) {
-      tokenCategory[_collectionAddress][tokenIds[i]] = category;
-      setCollection(category, _collectionAddress);
+      tokenCategory[collectionAddress][tokenIds[i]] = category;
+      setCollection(category, collectionAddress);
     }
     emit CategorySet(tokenIds, category);
   }
 
-  function setCollection(uint256 _categories, address _collectionAddress) internal {
-    categoryNFTAddress[_categories][_collectionAddress] = true;
-    emit SetCollection(_categories, _collectionAddress);
+  function setCollection(uint256 categories, address collectionAddress) internal {
+    categoryNFTAddress[categories][collectionAddress] = true;
+    emit SetCollection(categories, collectionAddress);
   }
 
-  function getCategory(uint256 tokenId, address _collectionAddress) public view returns (uint256) {
-    require(categoryNFTAddress[tokenCategory[_collectionAddress][tokenId]][_collectionAddress], "Invalid address");
-    return tokenCategory[_collectionAddress][tokenId];
+  function getCategory(uint256 tokenId, address collectionAddress) public view returns (uint256) {
+    require(categoryNFTAddress[tokenCategory[collectionAddress][tokenId]][collectionAddress], "Invalid address");
+    return tokenCategory[collectionAddress][tokenId];
   }
 }
