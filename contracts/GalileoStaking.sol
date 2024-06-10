@@ -9,164 +9,221 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./lib/Category.sol";
 import "hardhat/console.sol";
 
-error UnconfiguredCollection(uint256 collectionId);
-error UnconfiguredPool(uint256 collectionId);
+// Error indicating an invalid address for a collection
+error InvalidAddress(address collectionAddress);
+
+// Error indicating that a collection has not been initialized
+error CollectionUninitialized();
+
+// Error indicating that reward window times must be in increasing order
 error RewardWindowTimesMustIncrease();
-error InactivePool(uint256 collectionId);
+
+// Error indicating that a pool associated with a collection has not been initialized
+error PoolUninitialized(address collectionAddress);
+
+// Error indicating an invalid count of tokens
 error InvalidTokensCount(uint256 maxLeox);
+
+// Error indicating an invalid time
 error InvalidTime();
-error InvalidCategory();
+
+// Error indicating an invalid token ID
 error InvalidTokenId();
 
+// Error indicating that a token is already staked
+error TokenAlreadyStaked();
+
 contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
+  // Constant variable defining the ADMIN_ROLE using keccak256 hash
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-  bytes4 private constant _TRANSFER_FROM_SELECTOR = 0x23b872dd;
-  bytes4 private constant _TRANSFER_SELECTOR = 0xa9059cbb;
 
+  // Constants for function selectors
+  bytes4 private constant _TRANSFER_FROM_SELECTOR = 0x23b872dd; // Selector for transferFrom function
+  bytes4 private constant _TRANSFER_SELECTOR = 0xa9059cbb; // Selector for transfer function
+
+  // Immutable variable storing the address of the LEOX token
   address public immutable LEOX;
-  uint256 private nextCollectionId;
-  uint256 private constant increment = 200e18;
 
+  // Constant for increment value
+  uint256 private constant increment = 200e18; // 200 * 10^18
+
+  // Struct to store information about a stake per category
   struct StakePerCategory {
-    uint256 collectionId;
-    uint256 tokenId;
-    uint256 category;
-    uint256 timelockStartTime;
-    uint256 timelockEndTime;
-    uint256 points;
-    uint256 stakedLEOX;
+    address collectionAddress; // Address of the collection where the token is staked
+    uint256 tokenId; // ID of the token being staked
+    uint256 category; // Category of the token being staked
+    uint256 timelockStartTime; // Start time of the timelock for the staked token
+    uint256 timelockEndTime; // End time of the timelock for the staked token
+    uint256 points; // Points associated with the staked token
+    uint256 stakedLEOX; // Amount of LEOX tokens staked with the token
   }
 
-  struct LeoxInfo {
-    uint256[] tokenIds;
-    uint256 maxLeox;
-    uint256 yieldTraitPoints;
+  // Struct to store stake information for a category
+  struct StakeInfo {
+    uint256[] tokenIds; // Array of token IDs staked in this category
+    uint256 maxLeox; // Maximum LEOX staked in this category
+    uint256 yieldTraitPoints; // Points earned by staking in this category
+    string collectionName; // Name of the collection associated with this category
   }
 
+  // Struct to store staking multipliers
   struct Multiplier {
-    uint256 stakingTime;
-    uint256 stakingBoost;
+    uint256 stakingTime; // Duration of staking
+    uint256 stakingBoost; // Boost applied to staking rewards
   }
 
-  struct CollectionInfo {
-    address collectionAddress;
-    string collectionName;
-    mapping(uint256 => uint256) maxLeoxPerCategory;
-  }
-
+  // Struct to define a reward window
   struct RewardWindow {
-    uint128 startTime;
-    uint128 reward;
+    uint128 startTime; // Start time of the reward window
+    uint128 reward; // Reward value for the window
   }
 
+  // Struct to store data related to a pool
   struct PoolData {
-    uint256 totalPoints;
-    uint256 tax;
-    uint256 rewardCount;
-    mapping(uint256 => RewardWindow) rewardWindows;
+    uint256 totalPoints; // Total points accumulated in the pool
+    uint256 tax; // Tax applied to rewards
+    uint256 rewardCount; // Number of rewards configured for the pool
+    mapping(uint256 => RewardWindow) rewardWindows; // Mapping of reward windows by index
   }
 
+  // Struct defining input for configuring a pool
   struct PoolConfigurationInput {
-    uint256 collectionId;
-    uint256 tax;
-    RewardWindow[] rewardWindows;
+    address collectionAddress; // Address of the collection associated with the pool
+    uint256 tax; // Tax applied to rewards in the pool
+    RewardWindow[] rewardWindows; // Array of reward windows for the pool
   }
 
-  mapping(uint256 => PoolData) public pools;
-  mapping(uint256 => CollectionInfo) public collections;
+  // Mapping to store PoolData for each collection address
+  mapping(address => PoolData) private pools;
+
+  // Mapping to store the category of each collection
   mapping(address => uint256) public collectionToCategory;
-  mapping(address => mapping(uint256 => mapping(uint256 => StakePerCategory))) stakersPosition;
-  mapping(uint256 => LeoxInfo[]) public leoxInfoByCategory;
+
+  // Mapping to store stakers' positions by collection, staker address, and category
+  mapping(address => mapping(address => mapping(uint256 => StakePerCategory))) stakersPosition;
+
+  // Mapping to store stake information by category for each collection
+  mapping(address => StakeInfo[]) public leoxInfoByCategory;
+
+  // Mapping to store staking boost multipliers for each collection
   mapping(address => Multiplier[]) public stakingBoostPerCollection;
-  mapping(uint256 => uint256) public categoriesPerCollection;
+
+  // Mapping to store the number of categories for each collection
+  mapping(address => uint256) public categoriesPerCollection;
+
+  // Mapping to store the category associated with each NFT
   mapping(uint256 => uint256) public categoryPerNFT;
 
-  event ConfigureCollection(address collectionAddress, uint256 collectionId);
+  // Event emitted when a collection is configured with its address and total number of categories
+  event ConfigureCollection(address collectionAddress, uint256 totalCategories);
 
+  // Event emitted when a token is staked within a collection
   event StakeToken(
-    uint256 collectionId,
-    uint256 tokenId,
-    uint256 category,
-    uint256 timelockEndTime,
-    uint256 points,
-    uint256 stakedLEOX
+    address collectionAddress, // Address of the collection where the token is being staked
+    uint256 tokenId, // ID of the token being staked
+    uint256 category, // Category of the token being staked
+    uint256 timelockEndTime, // End time of the timelock for the staked token
+    uint256 points, // Points associated with the staked token
+    uint256 stakedLEOX // Amount of LEOX tokens staked with the token
   );
-  event MultipliersSet(uint256 collectionId, Multiplier[] multipliers);
+
+  // Event emitted when multipliers are set for a collection
+  event MultipliersSet(address collectionAddress, Multiplier[] multipliers);
 
   /**
-   * @dev construstor function
-   * @param _leox : LEOX ERC20 token address
+   * @dev Constructor to initialize the contract.
+   *
+   * @param _leox The address of the LEOX token contract.
    */
   constructor(address _leox) {
-    _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    _grantRole(ADMIN_ROLE, _msgSender());
+    // Ensure that the LEOX token address is not zero
     require(_leox != address(0), "Invalid Address - Address Zero");
+
+    // Grant the default admin role to the deploying address
+    _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+
+    // Grant the admin role to the deploying address
+    _grantRole(ADMIN_ROLE, _msgSender());
+
+    // Set the LEOX token address
     LEOX = _leox;
   }
 
   /**
-   * @dev stake function
-   * @param collectionId : collection Id of the pNFT collection
-   * @param tokenId : token id of the collection
-   * @param stakedLeox : amount of LEOX staked
-   * @param timelockEndTime : stake time lock
+   * @dev Function to stake tokens.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param tokenId The ID of the token to be staked.
+   * @param category The category of the token.
+   * @param stakedLeox The amount of LEOX tokens to be staked.
+   * @param timelockEndTime The end time of the timelock for the stake.
    */
   function stake(
-    uint256 collectionId,
+    address collectionAddress,
     uint256 tokenId,
     uint256 category,
     uint256 stakedLeox,
     uint256 timelockEndTime
   ) public nonReentrant {
-    address collectionAddress = getCollectionAddressById(collectionId);
-
+    // Check if the collection address is valid
     if (collectionAddress == address(0)) {
-      revert UnconfiguredCollection(collectionId);
+      revert InvalidAddress(collectionAddress);
     }
 
-    StakePerCategory memory _stakePerCategory = stakersPosition[_msgSender()][collectionId][category];
+    // Retrieve staker's position for the category within the collection
+    StakePerCategory memory _stakePerCategory = stakersPosition[_msgSender()][collectionAddress][category];
 
-    require(_stakePerCategory.tokenId != tokenId, "NFT is already staked");
+    // Ensure that the token is not already staked by the staker
+    if (_stakePerCategory.tokenId != tokenId) {
+      revert TokenAlreadyStaked();
+    }
 
-    _stakeTokens(collectionAddress, collectionId, tokenId, category, timelockEndTime, stakedLeox);
+    // Stake the tokens
+    _stakeTokens(collectionAddress, tokenId, category, timelockEndTime, stakedLeox);
   }
 
   /**
-   * @dev _stakeNFT internal function to stake NFTs
-   * @param collectionAddress : collection address of the NFT collection
-   * @param collectionId : collection Id of the pNFT collection
-   * @param tokenId : token id of the collection
-   * @param timelockEndTime : stake time lock
+   * @dev Internal function to stake tokens.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param tokenId The ID of the token to be staked.
+   * @param category The category of the token.
+   * @param timelockEndTime The end time of the timelock for the stake.
+   * @param stakedLeox The amount of LEOX tokens to be staked.
    */
   function _stakeTokens(
     address collectionAddress,
-    uint256 collectionId,
     uint256 tokenId,
     uint256 category,
     uint256 timelockEndTime,
     uint256 stakedLeox
   ) internal {
-    // Ensure the timelock end time is in the future
+    // Check if the timelock end time is in the future
     if (timelockEndTime < block.timestamp) {
       revert InvalidTime();
     }
 
-    // Ensure the pool is currently active
-    if (pools[collectionId].rewardWindows[0].startTime >= block.timestamp) {
-      revert InactivePool(uint256(collectionId));
+    // Check if the pool is initialized
+    if (pools[collectionAddress].rewardWindows[0].startTime >= block.timestamp) {
+      revert PoolUninitialized(collectionAddress);
     }
 
-    // Get the maximum allowed Leox tokens per category for the given collection
-    LeoxInfo memory _leoxInfo = getMaxLeoxPerCategory(collectionAddress, category);
+    // Get the maximum LEOX information for the specified category
+    StakeInfo memory _stakeInfo = getMaxLeoxPerCategory(collectionAddress, category);
 
-    // Ensure the staked amount does not exceed the maximum allowed
-    if (stakedLeox > _leoxInfo.maxLeox) {
-      revert InvalidTokensCount(_leoxInfo.maxLeox);
+    // Check if the collection is initialized
+    if (bytes(_stakeInfo.collectionName).length == 0) {
+      revert CollectionUninitialized();
     }
 
-    // Initialize a flag to check if the tokenId exists in the allowed list
+    // Check if the staked LEOX tokens exceed the maximum allowed
+    if (stakedLeox > _stakeInfo.maxLeox) {
+      revert InvalidTokensCount(_stakeInfo.maxLeox);
+    }
+
+    // Check if the token ID exists in the specified category
     bool tokenIdExists = false;
-    uint256[] memory tokenIds = _leoxInfo.tokenIds;
+    uint256[] memory tokenIds = _stakeInfo.tokenIds;
 
     // Check if the provided tokenId exists in the tokenIds array against category using assembly
     assembly {
@@ -185,17 +242,21 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
       }
     }
 
-    // Revert if the tokenId is not in the list of allowed tokenIds
+    // Revert if the token ID does not exist in the specified category
     if (!tokenIdExists) {
       revert InvalidTokenId();
     }
 
-    // Calculate the points for staking based on various factors
-    uint256 points = calculatePoints(collectionId, timelockEndTime, stakedLeox, _leoxInfo);
+    // Calculate the points for the stake
+    uint256 points = calculatePoints(collectionAddress, timelockEndTime, stakedLeox, _stakeInfo);
 
-    // Store the staking information in the stakersPosition mapping
-    stakersPosition[_msgSender()][collectionId][tokenId] = StakePerCategory(
-      collectionId,
+    // Update the total points for the pool
+    PoolData storage pool = pools[collectionAddress];
+    pool.totalPoints += points;
+
+    // Store the staker's position for the token
+    stakersPosition[_msgSender()][collectionAddress][tokenId] = StakePerCategory(
+      collectionAddress,
       tokenId,
       category,
       block.timestamp,
@@ -204,51 +265,59 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
       stakedLeox
     );
 
-    // Transfer the ERC-721 token from the staker to the contract
+    // Transfer the token to this contract
     _assetTransferFrom(collectionAddress, _msgSender(), address(this), tokenId);
 
-    // Transfer the staked LEOX(ERC-20) tokens from the staker to the contract
+    // Transfer the staked LEOX tokens to this contract
     _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
 
-    // Emit an event to log the staking action
-    emit StakeToken(collectionId, tokenId, category, block.timestamp + timelockEndTime, points, stakedLeox);
+    // Emit an event to signify the staking of tokens
+    emit StakeToken(collectionAddress, tokenId, category, block.timestamp + timelockEndTime, points, stakedLeox);
   }
 
   /**
    * @dev calculatePoints public function to calculate the staking points
-   * @param collectionId : collection Id of the pNFT collection
+   * @param collectionAddress : collection address of the pNFT collection
    * @param stakedLeox : token id of the collection
    * @param timelockEndTime : stake time lock
    * @return total calculated points
    */
   function calculatePoints(
-    uint256 collectionId,
-    uint256 timelockEndTime,
-    uint256 stakedLeox,
-    LeoxInfo memory _leoxInfo
-  ) public returns (uint256) {
-    Multiplier[] memory _multiplier = getMultipliers(collectionId);
+    address collectionAddress, // Address of the collection
+    uint256 timelockEndTime, // The end time of the timelock
+    uint256 stakedLeox, // Amount of staked LEOX tokens
+    StakeInfo memory _stakeInfo // Stake information struct
+  ) public view returns (uint256) {
+    // Get the multipliers for the given collection address
+    Multiplier[] memory _multiplier = getMultipliers(collectionAddress);
 
+    // Initialize the staking boost to zero
     uint256 stakingBoost = 0;
+
+    // Iterate over the multipliers to find the matching staking time
     for (uint128 i = 0; i < _multiplier.length; i++) {
       if (timelockEndTime == _multiplier[i].stakingTime) {
+        // Set the staking boost if the timelock end time matches
         stakingBoost = _multiplier[i].stakingBoost;
         break;
       }
     }
 
+    // Revert the transaction if no matching staking boost is found
     if (stakingBoost == 0) {
       revert InvalidTime();
     }
 
+    // Calculate the points for the staked LEOX tokens
     uint256 leoxPoints = calculateStakeLeoxPoints(stakedLeox);
 
-    uint256 yeildPointBoost = _leoxInfo.yieldTraitPoints * stakingBoost;
-    uint256 points = yeildPointBoost + leoxPoints;
+    // Calculate the yield point boost based on the yield trait points and staking boost
+    uint256 yieldPointBoost = _stakeInfo.yieldTraitPoints * stakingBoost;
 
-    PoolData storage pool = pools[collectionId];
-    pool.totalPoints += points;
+    // Calculate the total points by adding yield point boost and LEOX points
+    uint256 points = yieldPointBoost + leoxPoints;
 
+    // Return the total points
     return points;
   }
 
@@ -293,171 +362,159 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   }
 
   /**
-   * @dev calculateStakeLeoxPoints internal function to calculate points against LEOX
-   * @param stakedTokens : ERC20 tokens to be staked
-   * @return leoxPoints : points as per staked LEOX
+   * @dev Function to calculate the points for staked LEOX tokens.
+   *
+   * @param stakedTokens The number of staked LEOX tokens.
+   * @return The calculated points for the staked tokens.
    */
   function calculateStakeLeoxPoints(uint256 stakedTokens) public pure returns (uint256) {
+    // Calculate the base points by dividing the staked tokens by the increment
     uint256 points = stakedTokens / increment;
+
+    // Check if there's a remainder after division
     if (stakedTokens % increment == 0) {
+      // If no remainder, return points multiplied by 10^18 (to adjust decimals)
       return points * 10 ** 18;
     } else {
+      // If there's a remainder, return points adjusted by the remainder and the increment
       return (points * 10 ** 18) / increment;
     }
   }
 
   /**
-   * @dev configureCollection function to configure collection address
-   * @param collectionAddress : collection address of NFT address
-   * @param _LeoxInfo : token id of the collection
+   * @dev Function to configure a collection with stake information for LEOX tokens.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param _LeoxInfo An array of StakeInfo structs containing information about LEOX tokens.
    */
-  function configureCollection(address collectionAddress, LeoxInfo[] calldata _LeoxInfo) public onlyRole(ADMIN_ROLE) {
+  function configureCollection(address collectionAddress, StakeInfo[] calldata _LeoxInfo) public onlyRole(ADMIN_ROLE) {
+    // Get the name of the collection using the ERC721 interface
     string memory collectionName = ERC721(collectionAddress).name();
-    (address _collectionAddress, string memory _collectionName, ) = getCollectionDetailsByAddress(collectionAddress);
 
-    if (
-      collectionAddress != _collectionAddress &&
-      keccak256(abi.encodePacked(_collectionName)) != keccak256(abi.encodePacked(collectionName))
-    ) {
-      nextCollectionId++;
-    }
+    // Loop through each StakeInfo in the array and add them to the leoxInfoByCategory mapping
     for (uint256 i = 0; i < _LeoxInfo.length; i++) {
-      leoxInfoByCategory[nextCollectionId].push(
-        LeoxInfo(_LeoxInfo[i].tokenIds, _LeoxInfo[i].maxLeox, _LeoxInfo[i].yieldTraitPoints)
+      // Push the StakeInfo struct to the leoxInfoByCategory mapping
+      leoxInfoByCategory[collectionAddress].push(
+        StakeInfo(_LeoxInfo[i].tokenIds, _LeoxInfo[i].maxLeox, _LeoxInfo[i].yieldTraitPoints, collectionName)
       );
-      categoriesPerCollection[i + 1] = _LeoxInfo.length - 1;
+
+      // Set the number of categories per collection
+      categoriesPerCollection[collectionAddress] = _LeoxInfo.length;
     }
-    collections[nextCollectionId].collectionAddress = collectionAddress;
-    collections[nextCollectionId].collectionName = collectionName;
-    emit ConfigureCollection(collectionAddress, nextCollectionId);
+
+    // Emit an event to signify the successful configuration of the collection
+    emit ConfigureCollection(collectionAddress, _LeoxInfo.length);
   }
 
   /**
-   * @dev setMultipliers function set the multipliers by the admin
-   * @param collectionId : collection id of NFT address
-   * @param multipliers : staking time and staking boost
+   * @dev Function to set staking multipliers for a collection.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param multipliers An array of Multiplier structs containing staking time and boost information.
    */
-  function setMultipliers(uint256 collectionId, Multiplier[] calldata multipliers) public onlyRole(ADMIN_ROLE) {
-    address collectionAddress = getCollectionAddressById(collectionId);
-
+  function setMultipliers(address collectionAddress, Multiplier[] calldata multipliers) public onlyRole(ADMIN_ROLE) {
+    // Check if the collection address is valid
     if (collectionAddress == address(0)) {
-      revert UnconfiguredCollection(collectionId);
+      revert InvalidAddress(collectionAddress);
     }
 
+    // Loop through each Multiplier in the array and add them to the stakingBoostPerCollection mapping
     for (uint16 i = 0; i < multipliers.length; i++) {
+      // Push the Multiplier struct to the stakingBoostPerCollection mapping
       stakingBoostPerCollection[collectionAddress].push(multipliers[i]);
     }
 
-    emit MultipliersSet(collectionId, multipliers);
+    // Emit an event to signify the successful setting of multipliers for the collection
+    emit MultipliersSet(collectionAddress, multipliers);
   }
 
   /**
-   * @dev setMultipliers function set the multipliers by the admin
-   * @param collectionId : collection id of NFT address
-   * @return multipliers : staking time and staking boost
+   * @dev Function to get staking multipliers for a collection.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @return An array of Multiplier structs containing staking time and boost information.
    */
-  function getMultipliers(uint256 collectionId) public view returns (Multiplier[] memory) {
-    address collectionAddress = getCollectionAddressById(collectionId);
-
+  function getMultipliers(address collectionAddress) public view returns (Multiplier[] memory) {
+    // Check if the collection address is valid
     if (collectionAddress == address(0)) {
-      revert UnconfiguredCollection(collectionId);
+      revert InvalidAddress(collectionAddress);
     }
 
+    // Return the array of multipliers for the specified collection address
     return stakingBoostPerCollection[collectionAddress];
   }
 
   /**
-   * @dev getCollectionDetailsByAddress function to get data against collection address
-   * @param collectionAddress : collection address of NFT address
-   * @return _collectionAddress : ERC721 collection address
-   * @return collectionName : ERC721 collection name
-   * @return _collectionId : collection id
+   * @dev Function to get the maximum LEOX information for a specific category within a collection.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param category The category for which to get the maximum LEOX information.
+   * @return A StakeInfo struct containing the maximum LEOX information for the specified category.
    */
-  function getCollectionDetailsByAddress(
-    address collectionAddress
-  ) public view returns (address _collectionAddress, string memory collectionName, uint256 _collectionId) {
-    uint256 collectionId = _getCollectionByAddress(collectionAddress);
-    CollectionInfo storage collection = collections[collectionId];
+  function getMaxLeoxPerCategory(address collectionAddress, uint256 category) public view returns (StakeInfo memory) {
+    // Retrieve the array of StakeInfo structs for the specified collection address
+    StakeInfo[] memory _stakeInfo = leoxInfoByCategory[collectionAddress];
 
-    return (collection.collectionAddress, collection.collectionName, collectionId);
+    // Return the StakeInfo struct corresponding to the specified category
+    return _stakeInfo[category - 1];
   }
 
   /**
-   * @dev getMaxLeoxPerCategory function to get max leox against category
-   * @param collectionAddress : collection address of NFT address
-   * @param category : category id
-   * @return LeoxInfo
-   */
-  function getMaxLeoxPerCategory(address collectionAddress, uint256 category) public view returns (LeoxInfo memory) {
-    uint256 collectionId = _getCollectionByAddress(collectionAddress);
-    LeoxInfo[] memory _leoxInfo = leoxInfoByCategory[collectionId];
-
-    return _leoxInfo[category - 1];
-  }
-
-  /**
-   * @dev _getCollectionByAddress internal function to configure collection address
-   * @param collectionAddress : collection address of NFT address
-   * @return collection id
-   */
-  function _getCollectionByAddress(address collectionAddress) internal view returns (uint256) {
-    for (uint256 i = 0; i <= nextCollectionId; i++) {
-      if (collections[i].collectionAddress == collectionAddress) {
-        return i;
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * @dev getCollectionAddressById function to get collection address by id
-   * @param collectionId : collection id
-   * @return collection address
-   */
-  function getCollectionAddressById(uint256 collectionId) public view returns (address) {
-    if (collectionId <= nextCollectionId) {
-      return collections[collectionId].collectionAddress;
-    }
-    return address(0);
-  }
-
-  /**
-   * @dev getStakersPosition function to get staker's position
-   * @param walletAddress : wallet address of staker
-   * @param collectionId : collection id
-   * @param tokenId : token id
-   * @return staker's position
+   * @dev Function to get the staker's position for a specific token within a collection.
+   *
+   * @param walletAddress The address of the staker's wallet.
+   * @param collectionAddress The address of the collection contract.
+   * @param tokenId The ID of the token.
+   * @return A StakePerCategory struct containing the staker's position for the specified token.
    */
   function getStakersPosition(
     address walletAddress,
-    uint256 collectionId,
+    address collectionAddress,
     uint256 tokenId
   ) public view returns (StakePerCategory memory) {
-    return stakersPosition[walletAddress][collectionId][tokenId];
+    // Retrieve and return the staker's position for the specified token
+    return stakersPosition[walletAddress][collectionAddress][tokenId];
   }
 
   /**
-   * @dev configurePool function to get information of staked LEOX
-   * @param _inputs : configure the pool for staking
+   * @dev Function to configure pools with reward windows and tax information.
+   *
+   * @param _inputs An array of PoolConfigurationInput structs containing pool configuration information.
    */
   function configurePool(PoolConfigurationInput[] memory _inputs) public onlyRole(ADMIN_ROLE) {
+    // Iterate through each input in the array
     for (uint256 i; i < _inputs.length; ) {
+      // Get the number of reward windows for the current input
       uint256 poolRewardWindowCount = _inputs[i].rewardWindows.length;
-      pools[_inputs[i].collectionId].rewardCount = poolRewardWindowCount;
-      pools[_inputs[i].collectionId].tax = _inputs[i].tax;
 
+      // Set the reward count and tax for the pool
+      pools[_inputs[i].collectionAddress].rewardCount = poolRewardWindowCount;
+      pools[_inputs[i].collectionAddress].tax = _inputs[i].tax;
+
+      // Initialize a variable to store the last time for checking window times
       uint256 lastTime;
-      for (uint256 j; j < poolRewardWindowCount; ) {
-        pools[_inputs[i].collectionId].rewardWindows[j] = _inputs[i].rewardWindows[j];
 
+      // Iterate through each reward window for the current input
+      for (uint256 j; j < poolRewardWindowCount; ) {
+        // Set the reward window for the pool
+        pools[_inputs[i].collectionAddress].rewardWindows[j] = _inputs[i].rewardWindows[j];
+
+        // Check if the window start time is in increasing order
         if (j != 0 && _inputs[i].rewardWindows[j].startTime <= lastTime) {
+          // Revert if the window start times are not in increasing order
           revert RewardWindowTimesMustIncrease();
         }
+
+        // Update the last time to the current window's start time for the next iteration
         lastTime = _inputs[i].rewardWindows[j].startTime;
+
+        // Increment the index for the next reward window
         unchecked {
           j++;
         }
       }
+
+      // Increment the index for the next input
       unchecked {
         ++i;
       }
@@ -465,21 +522,27 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   }
 
   /**
-   * @dev getPoolConfiguration function to get the pool information and reward windows of a specific pool
-   * @param collectionId : collection id of the pool
-   * @return totalPoints : total points in the pool
-   * @return rewardCount : number of reward windows in the pool
-   * @return rewardWindows : array of RewardWindow structs
+   * @dev Function to get the configuration of a pool.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @return totalPoints The total points of the pool.
+   * @return rewardCount The count of reward windows in the pool.
+   * @return rewardWindows An array of RewardWindow structs containing information about reward windows.
    */
   function getPoolConfiguration(
-    uint256 collectionId
+    address collectionAddress
   ) public view returns (uint256 totalPoints, uint256 rewardCount, RewardWindow[] memory rewardWindows) {
-    PoolData storage pool = pools[collectionId];
+    // Retrieve the pool data for the specified collection address
+    PoolData storage pool = pools[collectionAddress];
+
+    // Set the total points and reward count from the pool data
     totalPoints = pool.totalPoints;
     rewardCount = pool.rewardCount;
 
+    // Initialize an array to store reward windows
     rewardWindows = new RewardWindow[](rewardCount);
 
+    // Copy each reward window from the pool data to the array
     for (uint256 i = 0; i < rewardCount; i++) {
       rewardWindows[i] = pool.rewardWindows[i];
     }
