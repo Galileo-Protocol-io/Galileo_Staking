@@ -48,7 +48,6 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
   // Immutable variable storing the address of the LEOX token
   address public immutable LEOX;
-  address public immutable GalileoSoulBoundToken;
 
   // Constant for increment value
   uint256 private constant increment = 200e18; // 200 * 10^18
@@ -97,14 +96,14 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     uint256 totalPoints; // Total points accumulated in the pool
     uint256 tax; // Tax applied to rewards
     uint256 rewardCount; // Number of rewards configured for the pool
-    mapping(uint256 => RewardWindow) rewardWindows; // Mapping of reward windows by index
+    RewardWindow rewardWindows; // Mapping of reward windows by index
   }
 
   // Struct defining input for configuring a pool
   struct PoolConfigurationInput {
     address collectionAddress; // Address of the collection associated with the pool
     uint256 tax; // Tax applied to rewards in the pool
-    RewardWindow[] rewardWindows; // Array of reward windows for the pool
+    RewardWindow rewardWindows; // Array of reward windows for the pool
   }
 
   // ═══════════════════════ MAPPINGS ════════════════════════
@@ -148,9 +147,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    * @dev Constructor to initialize the contract.
    *
    * @param _leox The address of the LEOX token contract.
-   * @param _galileoSoulBoundToken The address of the Soul Bound Token contract.
    */
-  constructor(address _leox, address _galileoSoulBoundToken) {
+  constructor(address _leox) {
     // Ensure that the LEOX token address is not zero
     require(_leox != address(0), "Invalid Address - Address Zero");
 
@@ -162,8 +160,6 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Set the LEOX token address
     LEOX = _leox;
-    // Set the Soul Bound Token address
-    GalileoSoulBoundToken = _galileoSoulBoundToken;
   }
 
   // ═══════════════════════ FUNCTIONS ════════════════════════
@@ -223,7 +219,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     }
 
     // Check if the pool is initialized
-    if (pools[collectionAddress].rewardWindows[0].startTime >= block.timestamp) {
+    if (pools[collectionAddress].rewardWindows.startTime >= block.timestamp) {
       revert PoolUninitialized(collectionAddress);
     }
 
@@ -287,10 +283,10 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
       stakedLeox
     );
 
-    // Transfer the token to this contract
+    // // Transfer the token to this contract
     // _assetTransferFrom(collectionAddress, _msgSender(), address(this), tokenId);
 
-    // // Transfer the staked LEOX tokens to this contract
+    // // // Transfer the staked LEOX tokens to this contract
     // _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
 
     // Emit an event to signify the staking of tokens
@@ -318,13 +314,6 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Iterate over the multipliers to find the matching staking time
     for (uint128 i = 0; i < _multiplier.length; i++) {
-      console.log(
-        "Timecompare ",
-        timelockEndTime == _multiplier[i].stakingTime,
-        timelockEndTime,
-        _multiplier[i].stakingTime
-      );
-
       if (timelockEndTime == _multiplier[i].stakingTime) {
         // Set the staking boost if the timelock end time matches
         stakingBoost = _multiplier[i].stakingBoost;
@@ -345,6 +334,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Calculate the total points by adding yield point boost and LEOX points
     uint256 points = yieldPointBoost + leoxPoints;
+
     // Return the total points
     return points;
   }
@@ -361,7 +351,12 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 			amount of ERC-20 tokens to attempt to transfer, depending on what 
 			interface is implemented by `_asset`.
 	*/
-  function _assetTransferFrom(address _asset, address _from, address _to, uint256 _idOrAmount) private {
+  function _assetTransferFrom(
+    address _asset,
+    address _from,
+    address _to,
+    uint256 _idOrAmount
+  ) private {
     (bool success, bytes memory data) = _asset.call(
       abi.encodeWithSelector(_TRANSFER_FROM_SELECTOR, _from, _to, _idOrAmount)
     );
@@ -380,7 +375,11 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 		@param _to The address to attempt to transfer the asset to.
 		@param _amount The amount of ERC-20 tokens or ERC-721 token to attempt to transfer.
 	*/
-  function _assetTransfer(address _asset, address _to, uint256 _amount) private {
+  function _assetTransfer(
+    address _asset,
+    address _to,
+    uint256 _amount
+  ) private {
     (bool success, bytes memory data) = _asset.call(abi.encodeWithSelector(_TRANSFER_SELECTOR, _to, _amount));
 
     // Revert if the low-level call fails.
@@ -402,29 +401,26 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     // Check if there's a remainder after division
     if (stakedTokens % increment == 0) {
       // If no remainder, return points multiplied by 10^18 (to adjust decimals)
-      return points * 10 ** 18;
+      return points * 10**18;
     } else {
       // If there's a remainder, return points adjusted by the remainder and the increment
-      return (points * 10 ** 18) / increment;
+      return (points * 10**18) / increment;
     }
   }
 
   /**
-   * @dev Function to issue the SBT to the staker at stake time.
+   * @dev Function to calculate the share points of shakers in the pool.
    *
-   * @param stakerAddress The address of the staker's wallet.
+   * @param stakerAddress The address of the staker.
+   * @param collectionAddress TThe address of the collection contract.
+   * @param tokenId The token ID within the collection
+   * @return The calculated shared points for the staked tokens.
    */
-  function _issueSoulBoundToken(address collectionAddress, address stakerAddress) internal {
-    address soulboundToken = soulboundTokenToCollection[collectionAddress];
-    // Call the Galileo Sould Bound Token contract to issue the token
-    IGALILEOSOULBOUNDTOKEN(soulboundToken).issue(stakerAddress);
-  }
-
- function calculateSharePoints(
+  function calculateSharePoints(
     address stakerAddress,
     address collectionAddress,
     uint256 tokenId
-) public view returns (uint256) {
+  ) public view returns (uint256) {
     // Retrieve the share points associated with the staker for the specified collection and token ID
     uint256 sharePoints = stakersPosition[stakerAddress][collectionAddress][tokenId].points;
 
@@ -437,14 +433,36 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Use a larger unit to prevent truncation to zero
     uint256 scaledSharePoints = sharePoints * 1e18;
+    console.log("scaledSharePoints: %s", scaledSharePoints);
+    // Calculate the staker's share points as a fraction of the total points in the pool
     uint256 stakersSharePoints = scaledSharePoints / totalPoints;
     console.log("stakersSharePoints: %s,  sharePoints: %s ", stakersSharePoints, sharePoints);
 
     // Return the calculated staker's share points
     return stakersSharePoints;
-}
+  }
 
+  function calculateReward(
+    address stakerAddress,
+    address collectionAddress,
+    uint256 tokenId
+  ) public view returns (uint256) {
+    uint256 stakersSharePoints = calculateSharePoints(stakerAddress, collectionAddress, tokenId);
+    (uint256 totalPoints, uint256 rewardCount, RewardWindow[] memory rewardWindows) = getPoolConfiguration(
+      collectionAddress
+    );
+  }
 
+  /**
+   * @dev Function to issue the SBT to the staker at stake time.
+   *
+   * @param stakerAddress The address of the staker's wallet.
+   */
+  function _issueSoulBoundToken(address collectionAddress, address stakerAddress) internal {
+    address soulboundToken = soulboundTokenToCollection[collectionAddress];
+    // Call the Galileo Sould Bound Token contract to issue the token
+    IGALILEOSOULBOUNDTOKEN(soulboundToken).issue(stakerAddress);
+  }
 
   /**
    * @dev Function to burn the SBT of the staker at unstake time.
@@ -498,6 +516,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
       revert InvalidAddress(collectionAddress);
     }
 
+    delete stakingBoostPerCollection[collectionAddress];
+
     // Loop through each Multiplier in the array and add them to the stakingBoostPerCollection mapping
     for (uint16 i = 0; i < multipliers.length; i++) {
       // Push the Multiplier struct to the stakingBoostPerCollection mapping
@@ -542,18 +562,18 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   /**
    * @dev Function to get the staker's position for a specific token within a collection.
    *
-   * @param walletAddress The address of the staker's wallet.
+   * @param stakerAddress The address of the staker's wallet.
    * @param collectionAddress The address of the collection contract.
    * @param tokenId The ID of the token.
    * @return A StakePerCategory struct containing the staker's position for the specified token.
    */
   function getStakersPosition(
-    address walletAddress,
+    address stakerAddress,
     address collectionAddress,
     uint256 tokenId
   ) public view returns (StakePerCategory memory) {
     // Retrieve and return the staker's position for the specified token
-    return stakersPosition[walletAddress][collectionAddress][tokenId];
+    return stakersPosition[stakerAddress][collectionAddress][tokenId];
   }
 
   /**
@@ -561,45 +581,36 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    *
    * @param _inputs An array of PoolConfigurationInput structs containing pool configuration information.
    */
-  // [["0xd7Ca4e99F7C171B9ea2De80d3363c47009afaC5F",3000000000000000000,[[12,2500]]]]
-  function configurePool(PoolConfigurationInput[] memory _inputs) public onlyRole(ADMIN_ROLE) {
+  // [["0x9cF86D8D08bC34248210474C4B019befb0fE70fA",3000000000000000000,[[12,2500]]]]
+  function configurePool(PoolConfigurationInput memory _inputs) public onlyRole(ADMIN_ROLE) {
     // Iterate through each input in the array
-    for (uint256 i; i < _inputs.length; ) {
+    // for (uint256 i; i < _inputs.length; ) {
       // Get the number of reward windows for the current input
-      uint256 poolRewardWindowCount = _inputs[i].rewardWindows.length;
+      uint256 poolRewardWindowCount = 1;
 
       // Set the reward count and tax for the pool
-      pools[_inputs[i].collectionAddress].rewardCount = poolRewardWindowCount;
-      pools[_inputs[i].collectionAddress].tax = _inputs[i].tax;
+      pools[_inputs.collectionAddress].rewardCount = poolRewardWindowCount;
+      pools[_inputs.collectionAddress].tax = _inputs.tax;
 
       // Initialize a variable to store the last time for checking window times
       uint256 lastTime;
 
-      // Iterate through each reward window for the current input
-      for (uint256 j; j < poolRewardWindowCount; ) {
-        // Set the reward window for the pool
-        pools[_inputs[i].collectionAddress].rewardWindows[j] = _inputs[i].rewardWindows[j];
-
-        // Check if the window start time is in increasing order
-        if (j != 0 && _inputs[i].rewardWindows[j].startTime <= lastTime) {
+        pools[_inputs.collectionAddress].rewardWindows = _inputs.rewardWindows;
+        if (_inputs.rewardWindows.startTime <= lastTime) {
           // Revert if the window start times are not in increasing order
           revert RewardWindowTimesMustIncrease();
         }
 
         // Update the last time to the current window's start time for the next iteration
-        lastTime = _inputs[i].rewardWindows[j].startTime;
-
-        // Increment the index for the next reward window
-        unchecked {
-          j++;
-        }
-      }
+        lastTime = _inputs.rewardWindows.startTime;
+     
+      
 
       // Increment the index for the next input
-      unchecked {
-        ++i;
-      }
-    }
+    //   unchecked {
+    //     ++i;
+    //   }
+    // }
   }
 
   /**
@@ -610,9 +621,15 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    * @return rewardCount The count of reward windows in the pool.
    * @return rewardWindows An array of RewardWindow structs containing information about reward windows.
    */
-  function getPoolConfiguration(
-    address collectionAddress
-  ) public view returns (uint256 totalPoints, uint256 rewardCount, RewardWindow[] memory rewardWindows) {
+  function getPoolConfiguration(address collectionAddress)
+    public
+    view
+    returns (
+      uint256 totalPoints,
+      uint256 rewardCount,
+      RewardWindow[] memory rewardWindows
+    )
+  {
     // Retrieve the pool data for the specified collection address
     PoolData storage pool = pools[collectionAddress];
 
@@ -625,7 +642,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Copy each reward window from the pool data to the array
     for (uint256 i = 0; i < rewardCount; i++) {
-      rewardWindows[i] = pool.rewardWindows[i];
+      rewardWindows[i] = pool.rewardWindows;
     }
   }
 }
