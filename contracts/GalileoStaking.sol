@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./lib/Category.sol";
+import "./interfaces/IGalileoSoulBoundToken.sol";
 import "hardhat/console.sol";
 
 // ═══════════════════════ ERORRS ════════════════════════
@@ -47,6 +48,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
   // Immutable variable storing the address of the LEOX token
   address public immutable LEOX;
+  address public immutable GalileoSoulBoundToken;
 
   // Constant for increment value
   uint256 private constant increment = 200e18; // 200 * 10^18
@@ -70,6 +72,12 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     uint256 maxLeox; // Maximum LEOX staked in this category
     uint256 yieldTraitPoints; // Points earned by staking in this category
     string collectionName; // Name of the collection associated with this category
+  }
+
+  struct StakeInfoInput {
+    uint256[] tokenIds; // Array of token IDs staked in this category
+    uint256 maxLeox; // Maximum LEOX staked in this category
+    uint256 yieldTraitPoints; // Points earned by staking in this category
   }
 
   // Struct to store staking multipliers
@@ -105,18 +113,21 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   mapping(address => PoolData) private pools;
 
   // Mapping to store stakers' positions by collection, staker address, and category
-  mapping(address => mapping(address => mapping(uint256 => StakePerCategory))) stakersPosition;
+  mapping(address => mapping(address => mapping(uint256 => StakePerCategory))) private stakersPosition;
 
   // Mapping to store stake information by category for each collection
-  mapping(address => StakeInfo[]) public leoxInfoByCategory;
+  mapping(address => StakeInfo[]) private leoxInfoByCategory;
 
   // Mapping to store staking boost multipliers for each collection
-  mapping(address => Multiplier[]) public stakingBoostPerCollection;
+  mapping(address => Multiplier[]) private stakingBoostPerCollection;
+
+  // Mapping to store Soul Bound Token address to collection address
+  mapping(address => address) public soulboundTokenToCollection;
 
   // ═══════════════════════ EVENTS ════════════════════════
 
   // Event emitted when a collection is configured with its address and total number of categories
-  event ConfigureCollection(address collectionAddress, uint256 totalCategories);
+  event ConfigureCollection(address indexed collectionAddress, uint256 totalCategories);
 
   // Event emitted when a token is staked within a collection
   event StakeToken(
@@ -137,8 +148,9 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
    * @dev Constructor to initialize the contract.
    *
    * @param _leox The address of the LEOX token contract.
+   * @param _galileoSoulBoundToken The address of the Soul Bound Token contract.
    */
-  constructor(address _leox) {
+  constructor(address _leox, address _galileoSoulBoundToken) {
     // Ensure that the LEOX token address is not zero
     require(_leox != address(0), "Invalid Address - Address Zero");
 
@@ -150,6 +162,8 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Set the LEOX token address
     LEOX = _leox;
+    // Set the Soul Bound Token address
+    GalileoSoulBoundToken = _galileoSoulBoundToken;
   }
 
   // ═══════════════════════ FUNCTIONS ════════════════════════
@@ -179,7 +193,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     StakePerCategory memory _stakePerCategory = stakersPosition[_msgSender()][collectionAddress][category];
 
     // Ensure that the token is not already staked by the staker
-    if (_stakePerCategory.tokenId != tokenId) {
+    if (_stakePerCategory.tokenId == tokenId) {
       revert TokenAlreadyStaked();
     }
 
@@ -204,7 +218,7 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     uint256 stakedLeox
   ) internal {
     // Check if the timelock end time is in the future
-    if (timelockEndTime < block.timestamp) {
+    if (timelockEndTime + block.timestamp < block.timestamp) {
       revert InvalidTime();
     }
 
@@ -259,6 +273,9 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     PoolData storage pool = pools[collectionAddress];
     pool.totalPoints += points;
 
+    // Issue Sould Bound Token to the staker
+    // _issueSoulBoundToken(collectionAddress, _msgSender());
+
     // Store the staker's position for the token
     stakersPosition[_msgSender()][collectionAddress][tokenId] = StakePerCategory(
       collectionAddress,
@@ -271,10 +288,10 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
     );
 
     // Transfer the token to this contract
-    _assetTransferFrom(collectionAddress, _msgSender(), address(this), tokenId);
+    // _assetTransferFrom(collectionAddress, _msgSender(), address(this), tokenId);
 
-    // Transfer the staked LEOX tokens to this contract
-    _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
+    // // Transfer the staked LEOX tokens to this contract
+    // _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
 
     // Emit an event to signify the staking of tokens
     emit StakeToken(collectionAddress, tokenId, category, block.timestamp + timelockEndTime, points, stakedLeox);
@@ -301,6 +318,13 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Iterate over the multipliers to find the matching staking time
     for (uint128 i = 0; i < _multiplier.length; i++) {
+      console.log(
+        "Timecompare ",
+        timelockEndTime == _multiplier[i].stakingTime,
+        timelockEndTime,
+        _multiplier[i].stakingTime
+      );
+
       if (timelockEndTime == _multiplier[i].stakingTime) {
         // Set the staking boost if the timelock end time matches
         stakingBoost = _multiplier[i].stakingBoost;
@@ -321,7 +345,6 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
 
     // Calculate the total points by adding yield point boost and LEOX points
     uint256 points = yieldPointBoost + leoxPoints;
-
     // Return the total points
     return points;
   }
@@ -387,26 +410,80 @@ contract GalileoStaking is Category, AccessControl, ReentrancyGuard {
   }
 
   /**
+   * @dev Function to issue the SBT to the staker at stake time.
+   *
+   * @param stakerAddress The address of the staker's wallet.
+   */
+  function _issueSoulBoundToken(address collectionAddress, address stakerAddress) internal {
+    address soulboundToken = soulboundTokenToCollection[collectionAddress];
+    // Call the Galileo Sould Bound Token contract to issue the token
+    IGALILEOSOULBOUNDTOKEN(soulboundToken).issue(stakerAddress);
+  }
+
+ function calculateSharePoints(
+    address stakerAddress,
+    address collectionAddress,
+    uint256 tokenId
+) public view returns (uint256) {
+    // Retrieve the share points associated with the staker for the specified collection and token ID
+    uint256 sharePoints = stakersPosition[stakerAddress][collectionAddress][tokenId].points;
+
+    // Retrieve the pool data associated with the collection
+    PoolData storage pool = pools[collectionAddress];
+
+    // Retrieve the total points within the pool for the specified collection
+    uint256 totalPoints = pool.totalPoints;
+    console.log("totalPoints: ", totalPoints);
+
+    // Use a larger unit to prevent truncation to zero
+    uint256 scaledSharePoints = sharePoints * 1e18;
+    uint256 stakersSharePoints = scaledSharePoints / totalPoints;
+    console.log("stakersSharePoints: %s,  sharePoints: %s ", stakersSharePoints, sharePoints);
+
+    // Return the calculated staker's share points
+    return stakersSharePoints;
+}
+
+
+
+  /**
+   * @dev Function to burn the SBT of the staker at unstake time.
+   *
+   * @param tokenId The token id that is burn.
+   */
+  function _burnSoulBoundToken(address collectionAddress, uint256 tokenId) internal {
+    address soulboundToken = soulboundTokenToCollection[collectionAddress];
+    // Call the Galileo Sould Bound Token contract to burn the token
+    IGALILEOSOULBOUNDTOKEN(soulboundToken).burn(tokenId);
+  }
+
+  /**
    * @dev Function to configure a collection with stake information for LEOX tokens.
    *
    * @param collectionAddress The address of the collection contract.
-   * @param _LeoxInfo An array of StakeInfo structs containing information about LEOX tokens.
+   * @param _stakeInfo An array of StakeInfo structs containing information about LEOX tokens.
    */
   // [[[1,2,3,4,5,6,7,8,9],5000000000000000000000,5],[[10,11,12,13,14,15,17,18,19,20],4000000000000000000000,4]]
-  function configureCollection(address collectionAddress, StakeInfo[] calldata _LeoxInfo) public onlyRole(ADMIN_ROLE) {
+  function configureCollection(
+    address collectionAddress,
+    address soulboundToken,
+    StakeInfoInput[] calldata _stakeInfo
+  ) public onlyRole(ADMIN_ROLE) {
     // Get the name of the collection using the ERC721 interface
     string memory collectionName = ERC721(collectionAddress).name();
 
+    soulboundTokenToCollection[collectionAddress] = soulboundToken;
+
     // Loop through each StakeInfo in the array and add them to the leoxInfoByCategory mapping
-    for (uint256 i = 0; i < _LeoxInfo.length; i++) {
+    for (uint256 i = 0; i < _stakeInfo.length; i++) {
       // Push the StakeInfo struct to the leoxInfoByCategory mapping
       leoxInfoByCategory[collectionAddress].push(
-        StakeInfo(_LeoxInfo[i].tokenIds, _LeoxInfo[i].maxLeox, _LeoxInfo[i].yieldTraitPoints, collectionName)
+        StakeInfo(_stakeInfo[i].tokenIds, _stakeInfo[i].maxLeox, _stakeInfo[i].yieldTraitPoints, collectionName)
       );
     }
 
     // Emit an event to signify the successful configuration of the collection
-    emit ConfigureCollection(collectionAddress, _LeoxInfo.length);
+    emit ConfigureCollection(collectionAddress, _stakeInfo.length);
   }
 
   /**

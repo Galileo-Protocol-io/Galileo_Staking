@@ -10,7 +10,7 @@ contract MockERC20 is ERC20, AccessControl {
   constructor() ERC20("Mock", "MOCK") {
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     _grantRole(ADMIN_ROLE, msg.sender);
-    _mint(_msgSender(), 10000000000 * 10 ** 18);
+    _mint(_msgSender(), 1000000000000 * 10 ** 18);
   }
 
   function mint(address to, uint256 amount) public onlyRole(ADMIN_ROLE) {
