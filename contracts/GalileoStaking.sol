@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -12,6 +12,7 @@ import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
 
 contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
+  
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
   // ██╔════╝ ██╔══██╗██║     ██║██║     ██╔════╝ ██╔═══██╗
   // ██║  ██╗ ███████║██║     ██║██║     █████╗   ██║   ██║
@@ -43,7 +44,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
   address public immutable LEOX;
 
   // Constant for increment value
-  uint256 private constant increment = 200 ether; // 200 wei
+  uint256 private constant increment = 200 ether; // 200 ethers
 
   /// A constant multiplier to reduce overflow in staking calculations.
   uint256 private constant PRECISION = 1 ether;
@@ -145,7 +146,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    */
   constructor(address _leox) {
     // Ensure that the LEOX token address is not zero
-    if(_leox == address(0)) revert GalileoStakingErrors.InvalidAddress(_leox);
+    if (_leox == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
     // Grant the default admin role to the deploying address
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -209,8 +210,6 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     uint256 stakedLeox,
     uint256 timelockEndTime
   ) public whenNotPaused nonReentrant updateReward(tokenId, collectionAddress, _msgSender()) {
-
-    if(tokenId == 0 || citizen == 0) revert GalileoStakingErrors.InvalidInput();
     // Check if the collection address is valid
     if (collectionAddress == address(0)) revert GalileoStakingErrors.CollectionUninitialized();
 
@@ -296,6 +295,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     // Calculate the points for the stake
     uint256 points = calculatePoints(collectionAddress, citizen, stakedLeox, timelockEndTime);
 
+    // Get the current time
     uint256 currentTime = block.timestamp;
 
     // Update the total points for the pool
@@ -319,9 +319,6 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     // Record the last reward time for this specific stake
     state.lastRewardTime[_msgSender()][collectionAddress][tokenId] = currentTime;
 
-    // // Update emission rate and reward window (likely triggered by a new stake)
-    // _updateEmissionRateAndRewardWindow(collectionAddress);
-
     // Add the StakePerCitizen struct to the user's staked NFTs list for this collection
     state.stakedNFTs[_msgSender()][collectionAddress].push(stakePerCitizen);
 
@@ -333,19 +330,14 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     // Increment the total staked amount for the collection (likely ERC721 tokens)
     state.erc721Staked[collectionAddress] += PRECISION;
 
-    // // Transfer the token to this contract
-    // _assetTransferFrom(
-    //     collectionAddress,
-    //     _msgSender(),
-    //     address(this),
-    //     tokenId
-    // );
+    // Transfer the token to this contract
+    _assetTransferFrom(collectionAddress, _msgSender(), address(this), tokenId);
 
-    // // Transfer the staked LEOX tokens to this contract
-    // _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
+    // Transfer the staked LEOX tokens to this contract
+    _assetTransferFrom(LEOX, _msgSender(), address(this), stakedLeox);
 
     // Issue Sould Bound Token to the staker
-    // _issueSoulBoundToken(collectionAddress, _msgSender());
+    _issueSoulBoundToken(collectionAddress, _msgSender());
 
     // Emit an event to signify the staking of tokens
     emit StakeTokens(collectionAddress, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
@@ -356,13 +348,11 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    *
    * @param collectionAddress The address of the collection contract.
    * @param rewardRate The new reward rate to be set for the upcoming reward window.
-   * @param startTime The start time of the new reward window.
    * @param endTime The end time of the new reward window.
    */
   function updateEmissionRate(
     address collectionAddress,
     uint256 rewardRate,
-    uint256 startTime,
     uint256 endTime
   ) public onlyRole(ADMIN_ROLE) {
     // Retrieve the total number of reward windows for the specified collection.
@@ -384,6 +374,9 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
 
     // Determine the index for the new reward window.
     uint256 updateIndex = pool.rewardWindows.length;
+
+    // Get the current time.
+    uint256 startTime = block.timestamp;
 
     // Set the share per window for the next reward window based on the total points in the pool.
     state.sharePerWindow[collectionAddress][updateIndex + 1] = pool.totalPoints;
@@ -466,7 +459,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     state.stakedNFTs[_msgSender()][collectionAddress][index] = stakePerCitizen;
 
     // Transfer the additional LEOX tokens to this contract
-    // _assetTransferFrom(LEOX, _msgSender(), address(this), stakeMoreLeox);
+    _assetTransferFrom(LEOX, _msgSender(), address(this), stakeMoreLeox);
 
     // Emit an event to signify the addition of more tokens to the stake
     emit StakeLeoxTokens(collectionAddress, tokenId, stakePerCitizen.citizen, newPoints, totalLeox);
@@ -484,7 +477,9 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     uint256 staked = state.erc721Staked[collectionAddress];
 
     // Handle division by zero (no tokens in supply)
-    if (supply == 0) revert GalileoStakingErrors.CollectionUninitialized();
+    if (supply == 0) {
+      return 0;
+    }
 
     // Calculate the staked percentage with high PRECISION (using 100e18 for 100%)
     return (staked * 100e18) / supply;
@@ -504,7 +499,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     uint256 timelockEndTime // The end time of the timelock
   ) public view returns (uint256) {
     // Get the multipliers for the given collection address
-    GalileoStakingStorage.Multiplier[] memory _multiplier = _getMultipliers(collectionAddress);
+    GalileoStakingStorage.Multiplier[] memory _multiplier = getMultipliers(collectionAddress);
 
     GalileoStakingStorage.StakeInfo memory _stakeInfo = getYieldTraitPoints(collectionAddress, citizen);
 
@@ -607,48 +602,39 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    * @param collectionAddress The address of the NFT collection.
    * @return The reward per token for the specified collection.
    */
+
   function rewardPerToken(address collectionAddress) public view returns (uint256) {
-    // Retrieve the pool data for the specified collection address
     GalileoStakingStorage.PoolData storage pool = state.pools[collectionAddress];
 
-    // If there are no points staked in the pool, return the stored reward per token value
     if (pool.totalPoints == 0) {
       return state.rewardPerTokenStored[collectionAddress];
     }
 
-    // Initialize rewardPerTokenAcc with the stored reward per token value
     uint256 rewardPerTokenAcc = state.rewardPerTokenStored[collectionAddress];
 
-    // Set the period start time to the last update time of the specified collection
+    pool.rewardWindows[pool.rewardWindows.length - 1];
     uint256 periodStart = state.lastUpdateTime[collectionAddress];
 
-    // Iterate through the reward windows in reverse order
-    for (uint256 i = pool.rewardCount; i > 0;) {
-      // Get the current reward window
-      GalileoStakingStorage.RewardWindow memory rewardWindows = pool.rewardWindows[i - 1];
+    // Calculate rewards based on the current active window
+    for (uint256 i = pool.rewardCount; i > 0; i--) {
+      GalileoStakingStorage.RewardWindow memory rewardWindow = pool.rewardWindows[i - 1];
 
-      // Check if the reward window start time is within the last update time and is greater than 0
-      if (rewardWindows.startTime <= state.lastUpdateTime[collectionAddress] && rewardWindows.startTime > 0) {
-        // Calculate the time period for the current reward window
+      if (block.timestamp > rewardWindow.startTime) {
+        // Only consider windows that have already started
         uint256 timePeriod = block.timestamp - periodStart;
 
-        // Calculate the accumulated reward per token
-        rewardPerTokenAcc += (rewardWindows.rewardRate * timePeriod * 1e18) / pool.totalPoints;
+        rewardPerTokenAcc += (rewardWindow.rewardRate * timePeriod * 1e18) / pool.totalPoints;
 
-        // Update the period start time to the reward window start time
-        periodStart = rewardWindows.startTime;
+        periodStart = rewardWindow.startTime;
 
-        // Break the loop if the reward window start time is within the last update time
-        if (rewardWindows.startTime <= state.lastUpdateTime[collectionAddress]) {
-          break;
-        }
+        break;
       }
-      unchecked {
-        i--;
+      // Break when the current active reward window is found
+      if (block.timestamp < rewardWindow.startTime) {
+        continue;
       }
     }
 
-    // Return the accumulated reward per token
     return rewardPerTokenAcc;
   }
 
@@ -664,7 +650,6 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     address collectionAddress,
     uint256 tokenId
   ) public view returns (uint256) {
-
     // Fetching the staker's position information for the specified token in the collection.
     GalileoStakingStorage.StakePerCitizen storage stakeInfo = state.stakersPosition[recipient][collectionAddress][
       tokenId
@@ -674,7 +659,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     return
       (stakeInfo.points *
         (rewardPerToken(collectionAddress) - state.userRewardPerTokenPaid[recipient][collectionAddress][tokenId])) /
-      1e18 +
+      PRECISION +
       state.rewards[recipient][collectionAddress][tokenId];
   }
 
@@ -715,16 +700,46 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     // Calculate the rewards for the recipient, collection address, and token ID.
     uint256 rewardAmount = calculateRewards(recipient, collectionAddress, tokenId);
 
+    GalileoStakingStorage.PoolData memory pool = state.pools[collectionAddress];
+
+    uint256 rewardsAfterTax = _calculateTax(collectionAddress, rewardAmount, pool.tax);
+
     // Check if there are rewards to withdraw.
-    if (rewardAmount > 0) {
+    if (rewardsAfterTax > 0) {
       // Reset the reward balance to zero after calculating.
       state.rewards[recipient][collectionAddress][tokenId] = 0;
 
       // Transfer the reward amount to the recipient.
-      // _assetTransfer(LEOX, recipient, rewardAmount);
+      _assetTransfer(LEOX, recipient, rewardsAfterTax);
     }
     // Emit an event indicating the withdrawal of rewards.
-    emit WithdrawRewards(recipient, collectionAddress, tokenId, rewardAmount, block.timestamp);
+    emit WithdrawRewards(recipient, collectionAddress, tokenId, rewardsAfterTax, block.timestamp);
+  }
+
+  /**
+   * @dev Calculates the tax on a given reward amount and updates the state with the tax amount.
+   *
+   * @param collectionAddress The address of the collection for which the tax is being calculated.
+   * @param rewardAmount The total amount of rewards from which the tax will be deducted.
+   * @param taxPercent The percentage of the reward amount that will be taken as tax. This value should be represented as a percentage multiplied by 100 ether for precision.
+   * @return totalRewardTokens The amount of reward tokens remaining after the tax has been deducted.
+   */
+  function _calculateTax(
+    address collectionAddress,
+    uint256 rewardAmount,
+    uint256 taxPercent
+  ) internal returns (uint256) {
+    // Calculate the tax amount by multiplying the reward amount with the tax percent and dividing by 100 ether.
+    uint256 taxAmount = (rewardAmount * taxPercent) / 100 ether;
+
+    // Subtract the calculated tax amount from the reward amount to get the total reward tokens.
+    uint256 totalRewardTokens = rewardAmount - taxAmount;
+
+    // Update the state with the calculated tax amount for the given collection address.
+    state.tax[collectionAddress] = taxAmount;
+
+    // Return the total reward tokens after deducting the tax.
+    return totalRewardTokens;
   }
 
   /**
@@ -784,13 +799,13 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     _withdrawRewards(recipient, collectionAddress, tokenId);
 
     // Burn Soul Bound Token
-    // _burnSoulBoundToken(collectionAddress, tokenId);
+    _burnSoulBoundToken(collectionAddress, tokenId);
 
     // Transfer the token back to the recipient
-    // _assetTransfer(collectionAddress, _msgSender(), tokenId);
+    _assetTransfer(collectionAddress, _msgSender(), tokenId);
 
     // Transfer the staked LEOX tokens back to the staker
-    // _assetTransfer(LEOX, _msgSender(), stakeInfo.stakedLEOX);
+    _assetTransfer(LEOX, _msgSender(), stakeInfo.stakedLEOX);
 
     // Emit an event to signify the unstaking of tokens
     emit UnstakeToken(collectionAddress, recipient, tokenId, points, stakeInfo.stakedLEOX);
@@ -832,8 +847,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     address soulboundToken,
     GalileoStakingStorage.StakeInfoInput[] calldata _stakeInfo
   ) public whenNotPaused onlyRole(ADMIN_ROLE) {
-    if (collectionAddress == address(0) && soulboundToken == address(0))
-      revert GalileoStakingErrors.InvalidAddress(collectionAddress);
+    if (collectionAddress == address(0) && soulboundToken == address(0)) revert GalileoStakingErrors.InvalidAddress();
     // Get the collection's name from the ERC721 contract
     string memory collectionName = ERC721(collectionAddress).name();
 
@@ -884,7 +898,6 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     // Check if the collection address is valid
     if (collectionAddress == address(0)) revert GalileoStakingErrors.CollectionUninitialized();
 
-    // Delete the staking boost configuration for the specified collection address
     delete state.stakingBoostPerCollection[collectionAddress];
 
     // Loop through each Multiplier in the array and add them to the stakingBoostPerCollection mapping
@@ -895,6 +908,22 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
 
     // Emit an event to signify the successful setting of multipliers for the collection
     emit SetMultipliers(collectionAddress, multipliers);
+  }
+
+  /**
+   * @dev Function to get staking multipliers for a collection.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @return An array of Multiplier structs containing staking time and boost information.
+   */
+  function getMultipliers(
+    address collectionAddress
+  ) public view returns (GalileoStakingStorage.Multiplier[] memory) {
+    // Check if the collection address is valid
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.CollectionUninitialized();
+
+    // Return the array of multipliers for the specified collection address
+    return state.stakingBoostPerCollection[collectionAddress];
   }
 
   /**
@@ -915,22 +944,6 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
 
     // Return the StakeInfo struct corresponding to the specified citizen
     return _stakeInfo[citizen - 1];
-  }
-
-  /**
-   * @dev Function to get staking multipliers for a collection.
-   *
-   * @param collectionAddress The address of the collection contract.
-   * @return An array of Multiplier structs containing staking time and boost information.
-   */
-  function _getMultipliers(
-    address collectionAddress
-  ) internal view returns (GalileoStakingStorage.Multiplier[] memory) {
-    // Check if the collection address is valid
-    if (collectionAddress == address(0)) revert GalileoStakingErrors.CollectionUninitialized();
-
-    // Return the array of multipliers for the specified collection address
-    return state.stakingBoostPerCollection[collectionAddress];
   }
 
   /**
@@ -999,6 +1012,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    * @param collectionAddress The address of the collection contract.
    * @return totalPoints The total points of the pool.
    * @return rewardCount The count of reward windows in the pool.
+   * @return tax The tax of the staking platform.
    * @return rewardWindows An array of RewardWindow structs containing information about reward windows.
    */
   function getPoolConfiguration(
@@ -1006,15 +1020,23 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
   )
     public
     view
-    returns (uint256 totalPoints, uint256 rewardCount, GalileoStakingStorage.RewardWindow[] memory rewardWindows)
+    returns (
+      uint256 totalPoints,
+      uint256 rewardCount,
+      uint256 tax,
+      GalileoStakingStorage.RewardWindow[] memory rewardWindows
+    )
   {
     // Retrieve the pool data for the specified collection address
     GalileoStakingStorage.PoolData storage pool = state.pools[collectionAddress];
 
-    // Set the total points and reward count from the pool data
+    // Set the total points from the pool data
     totalPoints = pool.totalPoints;
-    // Set the total points and reward count from the pool data
+    // Set the reward count from the pool data
     rewardCount = pool.rewardCount;
+
+    // Set the tax percentage from the pool data
+    tax = pool.tax;
 
     // Initialize an array to store reward windows
     rewardWindows = new GalileoStakingStorage.RewardWindow[](rewardCount);
@@ -1041,7 +1063,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     uint256 pageSize // Number of NFTs per page
   ) public view returns (GalileoStakingStorage.StakePerCitizen[] memory, uint256, uint256) {
     // Input validation to ensure page number starts from 1
-    require(pageNumber > 0, "Page number should start from 1");
+    require(pageNumber > 0, "Page number starts from 1");
 
     // Get the total number of staked NFTs for the recipient and collection
     uint256 totalStaked = state.stakedNFTs[recipient][collectionAddress].length;
@@ -1075,15 +1097,21 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     return (paginatedStakes, pageNumber, totalPages);
   }
 
-  // Function to pause the contract, restricting access to certain functions
+  /**
+   * @dev Function to pause the contract
+   * @notice Only callable by an address with the ADMIN_ROLE
+   */
   function pause() public onlyRole(ADMIN_ROLE) {
-    // Calls the internal _pause function provided by the Pausable contract
+    // Internal function that triggers the paused state
     _pause();
   }
 
-  // Function to unpause the contract, restoring access to restricted functions
+  /**
+   * @dev Function to unpause the contract
+   * @notice Only callable by an address with the ADMIN_ROLE
+   */
   function unpause() public onlyRole(ADMIN_ROLE) {
-    // Calls the internal _unpause function provided by the Pausable contract
+    // Internal function that lifts the paused state
     _unpause();
   }
 }

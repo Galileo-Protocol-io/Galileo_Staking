@@ -50,14 +50,14 @@ library GalileoStakingStorage {
     uint256 stakingBoost;
   }
 
-  // Struct to define a reward window for staking rewards
+  // Struct to define a reward window in the staking contract
   struct RewardWindow {
-    // The rate at which rewards are distributed during this window
+    // The reward rate applicable during this window (e.g., tokens per second)
     uint256 rewardRate;
-    // The timestamp indicating the start of the reward window
+    // The start time of this reward window (in seconds since epoch)
     uint256 startTime;
-    // The timestamp indicating the end of the reward window
-    uint256 endTime;
+    // The end time of this reward window (in seconds since epoch)
+    uint256 endTime; 
   }
 
   // Struct to store data of a staking pool
@@ -86,6 +86,8 @@ library GalileoStakingStorage {
   struct State {
     // Mapping from collection address to pool data
     mapping(address => PoolData) pools;
+    // Mapping from store the tax amount against collection address
+    mapping(address => uint256) tax;
     // Mapping to store staking positions
     mapping(address => mapping(address => mapping(uint256 => StakePerCitizen))) stakersPosition;
     // Mapping to store staked NFTs by user
@@ -104,6 +106,8 @@ library GalileoStakingStorage {
     mapping(address => uint256) lastUpdateTime;
     // Mapping to store reward per token stored
     mapping(address => uint256) rewardPerTokenStored;
+    // Mapping to store reward per token stored
+    mapping(address => uint256) rewardPerTokenStoredNewRewardWindow;
     // Mapping to store rewards paid per user per token
     mapping(address => mapping(address => mapping(uint256 => uint256))) userRewardPerTokenPaid;
     // Mapping to store rewards by user and token
