@@ -4,10 +4,10 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract MockERC20 is ERC20, AccessControl {
+contract ERC20Mock is ERC20, AccessControl {
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-  constructor() ERC20("Mock", "MOCK") {
+  constructor() ERC20("LEOX Token", "LEOX") {
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     _grantRole(ADMIN_ROLE, msg.sender);
     _mint(_msgSender(), 10000000000 * 10 ** 18);

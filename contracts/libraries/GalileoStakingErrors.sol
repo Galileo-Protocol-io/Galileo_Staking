@@ -13,9 +13,6 @@ library GalileoStakingErrors {
   // Error indicating that a collection has not been initialized
   error CollectionUninitialized();
 
-  // Error indicating that reward window times must be in increasing order
-  error RewardWindowPercentMustIncrease();
-
   // Error indicating that a pool associated with a collection has not been initialized
   error PoolUninitialized(address collectionAddress);
 
@@ -34,6 +31,18 @@ library GalileoStakingErrors {
   // Error indicating that a token is already staked
   error TokenAlreadyStaked();
 
-  // Error indicating that a token id is not staked
+  // Error indicating that the amount is zero
+  error InvalidAmount(uint256 amount);
+
+  // Error indicating that the owner is incorrect
+  error IncorrectOwner();
+
+  // Error indicating that the staker has not enough LEOX tokens
+  error InsufficientLEOXTokens(address staker);
+
+  // Error indicating that a token ID is not staked
   error TokenNotStaked();
+
+  // Error indicating that the citizen index is invalid
+  error InvalidCitizenIndex();
 }

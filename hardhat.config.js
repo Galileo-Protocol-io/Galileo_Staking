@@ -47,9 +47,6 @@ module.exports = {
     cache: "./cache",
     tests: "./test",
   },
-  // etherscan: {
-  //   apiKey: 'ZZNYA7JY49DW31IFZYR58QQU37SBF7ZXPS', // for ethereum
-  // },
   etherscan: {
     apiKey: {
       polygonMumbai: POLYGON_KEY,
