@@ -44,7 +44,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
   address public immutable LEOX;
 
   // Constant for INCREMENT value
-  uint256 private constant INCREMENT = 200 ether; // 200 ethers
+  uint256 private constant INCREMENT = 400 ether; // 400 LEOX indicates one point
 
   /// A constant multiplier to reduce overflow in staking calculations.
   uint256 private constant PRECISION = 1 ether;
