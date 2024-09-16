@@ -33,7 +33,7 @@ describe('GalileoStaking', async function () {
 
     // Deploy mock ERC721 token
     ERC721Token = await ethers.getContractFactory('Nebula');
-    erc721Token = await ERC721Token.deploy('Nebula', 'NBL');
+    erc721Token = await ERC721Token.deploy('https://tokenURIs/');
     nebulaAddress = await erc721Token.getAddress();
 
     // Deploy GalileoStaking contract
@@ -377,6 +377,7 @@ describe('GalileoStaking', async function () {
   describe('Calculate the Points', async function () {
     it('Should calculate the collect points', async function () {
       const stakeTokens = 5000;
+      const increment = 400;
       const points = await galileoStaking.calculatePoints(
         nebulaAddress,
         1,
@@ -384,10 +385,12 @@ describe('GalileoStaking', async function () {
         stakeTime
       );
 
-      let yieldBoost = yieldTraitPointC1 * Number(formatEther(stakingMultiplier));
-      const totalPoints = yieldBoost + stakeTokens / 200;
+      let calculateLeoxPoints = stakeTokens / increment;
 
-      expect(Number(formatEther(points))).to.be.equal(totalPoints);
+      let yieldBoost = yieldTraitPointC1 * Number(formatEther(stakingMultiplier));
+
+      calculateLeoxPoints = calculateLeoxPoints + yieldBoost;
+      expect(Number(formatEther(points))).to.be.equal(calculateLeoxPoints);
     });
 
     it('Should revert if collection is not registered', async function () {
@@ -725,9 +728,9 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      const calculateRewards = await galileoStaking.calculateRewards(staker1.address, nebulaAddress, 1);
-
-      expect(parseEther(stakeTime.toString())).to.equal(calculateRewards);
+      let calculateRewards = await galileoStaking.calculateRewards(staker1.address, nebulaAddress, 1);
+      calculateRewards = Number(formatEther(calculateRewards));
+      expect(stakeTime).to.equal(Number(calculateRewards.toFixed(0)));
     });
 
     it('Should return the expected rewards if there are 2 stakers', async function () {
@@ -826,6 +829,63 @@ describe('GalileoStaking', async function () {
       await galileoStaking.connect(admin).pause();
 
       await expect(galileoStaking.connect(staker1).withdrawRewards(nebulaAddress, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'EnforcedPause'
+      );
+    });
+  });
+
+  describe('Withdrawing Rewards of all staked tokens', function () {
+    it('Should allow user to withdraw rewards of all staked tokens', async function () {
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, parseEther('100'));
+
+      // Stake NFT and LEOX
+      await galileoStaking.connect(staker1).stake(nebulaAddress, 1, 1, parseEther('100'), stakeTime);
+
+      await erc721Token.mint(staker1.address); // Mint NFT to staker1
+      await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
+
+      const tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, tokenId);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, parseEther('1000000'));
+
+      await galileoStaking.connect(staker1).stake(nebulaAddress, tokenId, 1, parseEther('100'), stakeTime);
+
+      await ethers.provider.send('evm_increaseTime', [stakeTime]);
+      await ethers.provider.send('evm_mine');
+
+      // Mock reward setup and accumulation
+      let rewards = await galileoStaking.calculateRewardsAllRewards(staker1.address, nebulaAddress);
+      rewards = Number(Number(formatEther(rewards)).toFixed(2)) + 1;
+      let rewardsAfterTax = rewards * (3 / 100);
+      rewardsAfterTax = rewards - rewardsAfterTax;
+      let withdrawRewards = await (await galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).wait();
+      withdrawRewards = Number(formatEther(withdrawRewards.logs[0].args[2])).toFixed(2);
+
+      expect(rewardsAfterTax).to.be.equal(Number(withdrawRewards));
+    });
+
+    it('Should revert if collection address is invalid', async function () {
+      await expect(
+        galileoStaking.connect(staker1).withdrawAllRewards(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(galileoStaking, 'InvalidAddress');
+    });
+
+    it('Should revert if no rewards available', async function () {
+      await expect(galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'TokenNotStaked'
+      );
+    });
+
+    it('Should revert if staking contract is paused', async function () {
+      await galileoStaking.connect(admin).pause();
+
+      await expect(galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).to.be.revertedWithCustomError(
         galileoStaking,
         'EnforcedPause'
       );

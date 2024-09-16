@@ -8,17 +8,17 @@ const hre = require("hardhat");
 
 async function main() {
 
-  // const ERC20Mock =  await hre.ethers.deployContract("ERC20Mock");
-  // await ERC20Mock.waitForDeployment();
-  // console.log(
-  //   `Deployed to ${ERC20Mock.target}`
-  // );
-
-  const Nebula =  await hre.ethers.deployContract("Nebula", ["https://nebula-metadata-mainnet.s3.ap-southeast-2.amazonaws.com/nebula-odyssey-metadata/"]);
-  await Nebula.waitForDeployment();
+  const ERC20Mock =  await hre.ethers.deployContract("ERC20Mock");
+  await ERC20Mock.waitForDeployment();
   console.log(
-    `Deployed to ${Nebula.target}`
+    `Deployed to ${ERC20Mock.target}`
   );
+
+  // const Nebula =  await hre.ethers.deployContract("Nebula", ["https://nebula-metadata-mainnet.s3.ap-southeast-2.amazonaws.com/nebula-odyssey-metadata/"]);
+  // await Nebula.waitForDeployment();
+  // console.log(
+  //   `Deployed to ${Nebula.target}`
+  // );
 
   // const GalileoSoulBoundToken =  await hre.ethers.deployContract("GalileoSoulBoundToken", ["NebulaSBT", "NSBT", "https://tokenUri/"]);
   // await GalileoSoulBoundToken.waitForDeployment();

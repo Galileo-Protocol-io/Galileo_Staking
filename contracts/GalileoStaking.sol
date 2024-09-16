@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
-import "hardhat/console.sol";
 
 contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -107,7 +106,7 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    * @dev Event emitted when a recipient withdraws rewards for a staked NFT
    *
    * @param collectionAddress Address of the collection the NFT belongs to.
-   * @param recipient Address of the recipient who withdrew the rewards
+   * @param recipient Address of the recipient who withdraw the rewards
    * @param tokenId The ID of the token to which more tokens are staked.
    * @param rewardAmount Amount of rewards withdrawn.
    * @param currentTime Timestamp of the withdrawal.
@@ -116,6 +115,21 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
     address indexed collectionAddress,
     address indexed recipient,
     uint256 tokenId,
+    uint256 rewardAmount,
+    uint256 currentTime
+  );
+
+  /**
+   * @dev Event emitted when a recipient withdraws all rewards for all staked tokens
+   *
+   * @param collectionAddress Address of the collection the NFT belongs to.
+   * @param recipient Address of the recipient who withdraw the rewards
+   * @param rewardAmount Amount of rewards of all tokens withdrawn.
+   * @param currentTime Timestamp of the withdrawal.
+   */
+  event WithdrawAllRewards(
+    address indexed collectionAddress,
+    address indexed recipient,
     uint256 rewardAmount,
     uint256 currentTime
   );
@@ -563,16 +577,10 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
    */
   function _calculateStakeLeoxPoints(uint256 stakedTokens) internal pure returns (uint256) {
     // Calculate the base points by dividing the staked tokens by the INCREMENT
-    uint256 points = stakedTokens / INCREMENT;
+    uint256 points = ((stakedTokens * PRECISION) / INCREMENT) * PRECISION;
 
-    // Check if there's a remainder after division
-    if (stakedTokens % INCREMENT == 0) {
-      // If no remainder, return points multiplied by 10^18 (to adjust decimals)
-      return points * PRECISION;
-    } else {
-      // If there's a remainder, return points adjusted by the remainder and the INCREMENT
-      return (points * PRECISION) / INCREMENT;
-    }
+    // return points and adjust with percision
+    return points / PRECISION;
   }
 
   /**
@@ -648,6 +656,34 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
   }
 
   /**
+   * @dev Calculates the rewards earned by a staker for all tokens staked in a collection.
+   * @param recipient The address of the staker.
+   * @param collectionAddress The address of the NFT collection.
+   * @return The calculated reward for the staker.
+   */
+  function calculateRewardsAllRewards(address recipient, address collectionAddress) public view returns (uint256) {
+    // Initialize total rewards to zero.
+    uint256 totalRewards = 0;
+
+    // Retrieve all the staked NFTs for the user in the given collection.
+    GalileoStakingStorage.StakePerCitizen[] memory stakedNFTs = state.stakedNFTs[recipient][collectionAddress];
+
+    // Iterate over each staked token ID and calculate its respective rewards.
+    for (uint256 i = 0; i < stakedNFTs.length; i++) {
+      // Fetch the tokenId of the staked NFT.
+      uint256 tokenId = stakedNFTs[i].tokenId;
+
+      // Calculate rewards for the specific tokenId by calling the reward calculation logic.
+      uint256 reward = calculateRewards(recipient, collectionAddress, tokenId);
+
+      // Add the reward for this tokenId to the total rewards.
+      totalRewards += reward;
+    }
+
+    return totalRewards; // Return the total accumulated rewards across all staked NFTs.
+  }
+
+  /**
    * @dev Withdraws the accumulated rewards for a staked token.
    * The function ensures the caller has a valid collection address and token ID.
    * It updates the reward before processing the withdrawal.
@@ -701,6 +737,91 @@ contract GalileoStaking is Pausable, AccessControl, ReentrancyGuard {
 
     // Emit an event to log the withdrawal of rewards, including timestamp for tracking.
     emit WithdrawRewards(recipient, collectionAddress, tokenId, rewardsAfterTax, block.timestamp);
+  }
+
+  /**
+   * @dev Withdraw all rewards for a user for all staked token IDs in a specific collection.
+   * The function ensures the caller has a valid collection address.
+   * It updates the reward before processing the withdrawal.
+   *
+   * @param collectionAddress The address of the NFT collection.
+   */
+  function withdrawAllRewards(address collectionAddress) public whenNotPaused nonReentrant {
+    // Call the internal function that handles the reward withdrawal logic.
+    _withdrawAllRewards(collectionAddress);
+  }
+
+  /**
+   * @dev Internal function to handle the logic of withdrawing all rewards for a given collection address.
+   * This function iterates over all staked token IDs of the user and accumulates the rewards.
+   *
+   * @param collectionAddress The address of the NFT collection.
+   */
+  function _withdrawAllRewards(address collectionAddress) internal {
+    // Input Validation: Ensure the collection address is not the zero address.
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Get the address of the user who is calling the function (msg.sender).
+    address recipient = _msgSender();
+
+    // Fetch the array of all staked NFTs for the user in the specified collection.
+    GalileoStakingStorage.StakePerCitizen[] memory stakedNFTs = state.stakedNFTs[recipient][collectionAddress];
+
+    // Ensure that the user has staked NFTs. If not, revert with a TokenNotStaked error.
+    if (stakedNFTs.length == 0) {
+      revert GalileoStakingErrors.TokenNotStaked();
+    }
+
+    // Initialize a variable to accumulate the total reward amount across all token IDs.
+    uint256 totalRewardAmount = 0;
+
+    // Get the current time
+    uint256 currentTime = block.timestamp;
+
+    totalRewardAmount = calculateRewardsAllRewards(recipient, collectionAddress);
+
+    if (totalRewardAmount > 0) {
+      // Loop through each staked NFT token in the collection.
+      for (uint256 i = 0; i < stakedNFTs.length; i++) {
+        // Extract the token ID of the staked NFT.
+        uint256 tokenId = stakedNFTs[i].tokenId;
+
+        // Calculate the rewards for the specific token ID by calling the `calculateRewards` function.
+
+        // Temporarily store the calculated rewards for this token ID in the rewards mapping.
+        state.rewards[recipient][collectionAddress][tokenId] = calculateRewards(recipient, collectionAddress, tokenId);
+
+        // Update the reward per token stored value for the collection to the most current value.
+        state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
+
+        // Update the last update time for the collection to the current block timestamp.
+        state.lastUpdateTime[collectionAddress] = currentTime;
+
+        // If the reward amount for the token ID is greater than zero, add it to the total reward amount.
+
+        // Reset the rewards mapping for this token ID to zero since we are withdrawing them.
+        state.rewards[recipient][collectionAddress][tokenId] = 0;
+
+        // Update the user's paid reward per token to reflect the latest stored reward per token for the collection.
+        state.userRewardPerTokenPaid[recipient][collectionAddress][tokenId] = state.rewardPerTokenStored[
+          collectionAddress
+        ];
+      }
+    } else {
+      revert GalileoStakingErrors.InvalidAmount(totalRewardAmount);
+    }
+
+    // Retrieve the pool data for the specified collection (e.g., tax, etc.).
+    GalileoStakingStorage.PoolData memory pool = state.pools[collectionAddress];
+
+    // Calculate the rewards after applying any applicable tax from the pool's tax rate.
+    uint256 rewardsAfterTax = _calculateTax(collectionAddress, totalRewardAmount, pool.tax);
+
+    // Transfer the reward tokens to the user.
+    // _assetTransfer(LEOX, recipient, rewardsAfterTax);
+
+    // Emit an event to log the reward withdrawal for the user across all token IDs in the collection.
+    emit WithdrawAllRewards(collectionAddress, recipient, rewardsAfterTax, currentTime);
   }
 
   /**
