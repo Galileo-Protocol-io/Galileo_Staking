@@ -22,8 +22,6 @@ library GalileoStakingStorage {
 
   // Struct to store staking information for a collection
   struct StakeInfo {
-    // Array of token IDs staked in this citizen
-    uint256[] tokenIds;
     // Maximum LEOX tokens staked in this citizen
     uint256 maxLeox;
     // Points earned by staking in this citizen
@@ -32,10 +30,23 @@ library GalileoStakingStorage {
     string collectionName;
   }
 
+  struct StakeTokens {
+    // Address of the NFT collection
+    address collectionAddress;
+    //  Token ID of the staked NFT
+    uint256 tokenId;
+    //Citizen ID associated with the staked NFT
+    uint256 citizen;
+    // The timestamp representing the end time of the staking period.
+    uint256 timelockEndTime;
+    // The amount of LEOX tokens staked along with the NFT.
+    uint256 stakedLeox;
+    // A cryptographic signature to verify the validity of the staked data, ensuring security and authenticity.
+    bytes signature;
+  }
+
   // Input struct for providing stake information
   struct StakeInfoInput {
-    // Array of token IDs staked in this citizen
-    uint256[] tokenIds;
     // Maximum LEOX tokens staked in this citizen
     uint256 maxLeox;
     // Points earned by staking in this citizen
@@ -57,7 +68,7 @@ library GalileoStakingStorage {
     // The start time of this reward window (in seconds since epoch)
     uint256 startTime;
     // The end time of this reward window (in seconds since epoch)
-    uint256 endTime; 
+    uint256 endTime;
   }
 
   // Struct to store data of a staking pool

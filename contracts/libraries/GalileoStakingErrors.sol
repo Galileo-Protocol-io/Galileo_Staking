@@ -45,4 +45,7 @@ library GalileoStakingErrors {
 
   // Error indicating that the citizen index is invalid
   error InvalidCitizenIndex();
+
+  // Error indicating that signature is invalid
+  error InvalidSignature();
 }

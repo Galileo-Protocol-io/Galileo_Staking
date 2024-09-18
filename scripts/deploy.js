@@ -8,16 +8,16 @@ const hre = require("hardhat");
 
 async function main() {
 
-  const ERC20Mock =  await hre.ethers.deployContract("ERC20Mock");
-  await ERC20Mock.waitForDeployment();
-  console.log(
-    `Deployed to ${ERC20Mock.target}`
-  );
-
-  // const Nebula =  await hre.ethers.deployContract("Nebula", ["https://nebula-metadata-mainnet.s3.ap-southeast-2.amazonaws.com/nebula-odyssey-metadata/"]);
-  // await Nebula.waitForDeployment();
+  // const MockLeox =  await hre.ethers.deployContract("MockLeox");
+  // await MockLeox.waitForDeployment();
   // console.log(
-  //   `Deployed to ${Nebula.target}`
+  //   `Deployed to ${MockLeox.target}`
+  // );
+
+  // const MockNebula =  await hre.ethers.deployContract("MockNebula", ["https://nebula-metadata-mainnet.s3.ap-southeast-2.amazonaws.com/nebula-odyssey-metadata/"]);
+  // await MockNebula.waitForDeployment();
+  // console.log(
+  //   `Deployed to ${MockNebula.target}`
   // );
 
   // const GalileoSoulBoundToken =  await hre.ethers.deployContract("GalileoSoulBoundToken", ["NebulaSBT", "NSBT", "https://tokenUri/"]);
@@ -26,11 +26,11 @@ async function main() {
   //   `Deployed to ${GalileoSoulBoundToken.target}`
   // );
 
-  // const GalileoStaking =  await hre.ethers.deployContract("GalileoStaking", ["0x7a3B78932482d4957999d46e863B011866044493"]);
-  // await GalileoStaking.waitForDeployment();
-  // console.log(
-  //   `Deployed to ${GalileoStaking.target}`
-  // );
+  const GalileoStaking =  await hre.ethers.deployContract("GalileoStaking", ["0x94A13A56497CDE65b5B6D7843484fa2287197c4a"]);
+  await GalileoStaking.waitForDeployment();
+  console.log(
+    `Deployed to ${GalileoStaking.target}`
+  );
 }
 
 // We recommend this pattern to be able to use async/await everywhere
@@ -42,4 +42,4 @@ main().catch((error) => {
 
 // npx hardhat run scripts/deploy.js --network polygonTestnet
 
-// npx hardhat verify --network polygonTestnet 0x7a3B78932482d4957999d46e863B011866044493
+// npx hardhat verify --network polygonTestnet 0x94A13A56497CDE65b5B6D7843484fa2287197c4a
