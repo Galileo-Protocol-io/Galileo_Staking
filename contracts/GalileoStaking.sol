@@ -25,6 +25,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
 
   // Constant variable defining the ADMIN_ROLE using keccak256 hash
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
   // Constant variable defining the VALIDATOR_ROLE using keccak256 hash
   bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
 
@@ -1239,32 +1240,42 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
   }
 
   /**
-   * @dev Recovers the signer's address from the voucher's signature.
-   *      - This function verifies the authenticity of the voucher by hashing its data and comparing it with the provided signature.
-   *      - It ensures that the signature corresponds to an address with the `SUB_ADMIN_ROLE`.
-   * @param stakeTokens A struct containing details of the NFT voucher, including URI, price, fees, and signature.
+   * @dev Recovers the signer's address and verifies the authenticity of the provided `StakeTokens` voucher by hashing its data
+   *        and comparing the result with the provided signature.
+   *      - It uses EIP-712 typed data hashing to ensure the integrity of the data structure.
+   *      - Additionally, the function checks if the recovered signer has the `VALIDATOR_ROLE` to ensure
+   *        only authorized addresses can sign vouchers.
+   * @param stakeTokens A struct containing details of the NFT staking voucher. It includes:
+   *        - `collectionAddress`: The address of the NFT collection to which the voucher refers.
+   *        - `tokenId`: The specific NFT token being staked.
+   *        - `citizen`: The ID or address of the citizen participating in the staking.
+   *        - `signature`: The signature that verifies the authenticity of the voucher.
    */
   function _recover(GalileoStakingStorage.StakeTokens calldata stakeTokens) internal view {
-    // Create the digest for the voucher using the EIP-712 typed data hashing.
+    // EIP-712 provides a standardized way to hash typed data, ensuring consistent
     bytes32 digest = _hashTypedDataV4(
       keccak256(
         abi.encode(
           keccak256(
-            // The EIP-712 typehash for the GalileoProtocolVoucher struct.
+            // Define the structure of the typed data for the voucher in EIP-712 format.
             "GalileoStakeTokens(address collectionAddress,uint256 tokenId,uint256 citizen)"
           ),
-          // Encode the actual data of the voucher into the hash.
-          stakeTokens.collectionAddress, // Price of the NFT.
-          stakeTokens.tokenId, // Tax associated with the NFT.
-          stakeTokens.citizen // Referral fee for the NFT sale.
+          // Encode the actual data from the `StakeTokens` struct into the hash.
+          // Address of the NFT collection.
+          stakeTokens.collectionAddress,
+          // ID of the NFT token being staked.
+          stakeTokens.tokenId,
+          // ID or address of the citizen in the staking process.
+          stakeTokens.citizen
         )
       )
     );
 
-    // Recover the address that signed the digest from the provided signature.
+    // Recover the address of the signer from the hash digest and the provided signature.
+    // The ECDSA algorithm is used here to reverse the signature back into the signer's address.
     address signer = ECDSA.recover(digest, stakeTokens.signature);
 
-    // Ensure that the recovered address has the SUB_ADMIN_ROLE.
+    // Verify that the recovered signer has the `VALIDATOR_ROLE`.
     if (!hasRole(VALIDATOR_ROLE, signer)) revert GalileoStakingErrors.InvalidSignature();
   }
 
