@@ -75,6 +75,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   /**
    * @dev Event emitted when a token is staked within a collection
    *
+   * @param recipient The address of the staker.
    * @param collectionAddress The address of the collection contract.
    * @param tokenId The ID of the token to which more tokens are staked.
    * @param citizen The citizen of the token.
@@ -83,6 +84,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakedLEOX  Amount of LEOX tokens staked with the token.
    */
   event StakeTokens(
+    address recipient,
     address collectionAddress,
     uint256 tokenId,
     uint256 citizen,
@@ -94,6 +96,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   /**
    * @dev Event emitted when more LEOX tokens are added to an existing stake.
    *
+   * @param recipient The address of the staker.
    * @param collectionAddress The address of the collection contract.
    * @param tokenId The ID of the token to which more tokens are staked.
    * @param citizen The citizen of the token.
@@ -101,6 +104,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param totalLeox The total amount of LEOX tokens staked after adding more tokens.
    */
   event StakeLeoxTokens(
+    address recipient,
     address indexed collectionAddress,
     uint256 indexed tokenId,
     uint256 indexed citizen,
@@ -329,29 +333,32 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       stakedLeox
     );
 
+    // Get the address of the user who is calling the function (msg.sender).
+    address recipient = _msgSender();
+
     // Store staking information for the user, collection, and token ID
-    state.stakersPosition[_msgSender()][collectionAddress][tokenId] = stakePerCitizen;
+    state.stakersPosition[recipient][collectionAddress][tokenId] = stakePerCitizen;
 
     // Add the StakePerCitizen struct to the user's staked NFTs list for this collection
-    state.stakedNFTs[_msgSender()][collectionAddress].push(stakePerCitizen);
+    state.stakedNFTs[recipient][collectionAddress].push(stakePerCitizen);
 
     // Store the index of the newly added stake within the stakedNFTs list
-    state.stakedNFTIndex[_msgSender()][collectionAddress][tokenId] = state.stakedNFTs[_msgSender()][collectionAddress].length - 1;
+    state.stakedNFTIndex[recipient][collectionAddress][tokenId] = state.stakedNFTs[recipient][collectionAddress].length - 1;
 
     // Increment the total staked amount for the collection (likely ERC721 tokens)
     state.erc721Staked[collectionAddress] += PRECISION;
 
     // Transfer the token to this contract
-    IERC721(collectionAddress).safeTransferFrom(_msgSender(), address(this), tokenId);
+    IERC721(collectionAddress).safeTransferFrom(recipient, address(this), tokenId);
 
     // Transfer the staked LEOX tokens to this contract
-    IERC20(LEOX).safeTransferFrom(_msgSender(), address(this), stakedLeox);
+    IERC20(LEOX).safeTransferFrom(recipient, address(this), stakedLeox);
 
     // Issue Sould Bound Token to the staker
-    _issueSoulBoundToken(collectionAddress, _msgSender());
+    _issueSoulBoundToken(collectionAddress, recipient);
 
     // Emit an event to signify the staking of tokens
-    emit StakeTokens(collectionAddress, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
+    emit StakeTokens(recipient, collectionAddress, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
   }
 
   /**
@@ -464,15 +471,18 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     stakePerCitizen.points = newPoints;
     stakePerCitizen.stakedLEOX = totalLeox;
 
+    // Get the address of the user who is calling the function (msg.sender).
+    address recipient = _msgSender();
+
     // Update the stakedNFTs list for the user.
-    uint256 index = state.stakedNFTIndex[_msgSender()][collectionAddress][tokenId];
-    state.stakedNFTs[_msgSender()][collectionAddress][index] = stakePerCitizen;
+    uint256 index = state.stakedNFTIndex[recipient][collectionAddress][tokenId];
+    state.stakedNFTs[recipient][collectionAddress][index] = stakePerCitizen;
 
     // Transfer the additional LEOX tokens from the staker to the contract.
-    IERC20(LEOX).safeTransferFrom(_msgSender(), address(this), stakeMoreLeox);
+    IERC20(LEOX).safeTransferFrom(recipient, address(this), stakeMoreLeox);
 
     // Emit an event indicating that more LEOX tokens were added to the stake.
-    emit StakeLeoxTokens(collectionAddress, tokenId, stakePerCitizen.citizen, newPoints, totalLeox);
+    emit StakeLeoxTokens(recipient, collectionAddress, tokenId, stakePerCitizen.citizen, newPoints, totalLeox);
   }
 
   /**
@@ -506,7 +516,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       }
     }
 
-     // Revert the transaction if no matching staking boost is found
+    // Revert the transaction if no matching staking boost is found
     if (stakingBoost == 0) revert GalileoStakingErrors.InvalidTime();
 
     // Calculate the points for the staked LEOX tokens
@@ -1261,7 +1271,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     _unpause();
   }
 
-   /**
+  /**
    * @dev Handles the receipt of ERC721 tokens.
    * This function is called by the ERC721 token contract when tokens are transferred to this contract.
    * It ensures that the contract accepts the transfer by returning the function selector.
