@@ -8,7 +8,7 @@ const hre = require("hardhat");
 
 async function main() {
 
-  // const MockLeox =  await hre.ethers.deployContract("MockLeox");
+  // const MockLeox =  await hre.ethers.deployContract("MockLeox", ["Mock LEOX", "LEOX", 18, hre.ethers.parseEther("10000000000"), "0x30cfa2dd6b79Bc800B0b8cbF89534Aa4D02D548A", "0x30cfa2dd6b79Bc800B0b8cbF89534Aa4D02D548A", hre.ethers.parseEther("10000000000000"), true ]);
   // await MockLeox.waitForDeployment();
   // console.log(
   //   `Deployed to ${MockLeox.target}`
@@ -26,7 +26,7 @@ async function main() {
   //   `Deployed to ${GalileoSoulBoundToken.target}`
   // );
 
-  const GalileoStaking =  await hre.ethers.deployContract("GalileoStaking", ["0x94A13A56497CDE65b5B6D7843484fa2287197c4a"]);
+  const GalileoStaking =  await hre.ethers.deployContract("GalileoStaking", ["0x016C615b39f70D5daAf2d8eE3887EAF0305cB8d7"]);
   await GalileoStaking.waitForDeployment();
   console.log(
     `Deployed to ${GalileoStaking.target}`
@@ -42,4 +42,4 @@ main().catch((error) => {
 
 // npx hardhat run scripts/deploy.js --network polygonTestnet
 
-// npx hardhat verify --network polygonTestnet 0x94A13A56497CDE65b5B6D7843484fa2287197c4a
+// npx hardhat verify --network polygonTestnet 0x1F75d9CE022F43df4e944D11022bF412e20895e8 0x016C615b39f70D5daAf2d8eE3887EAF0305cB8d7

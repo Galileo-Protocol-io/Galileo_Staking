@@ -1,8 +1,8 @@
-require("@nomicfoundation/hardhat-toolbox");
-
-require("dotenv").config();
+require('@nomicfoundation/hardhat-toolbox');
+require("hardhat-gas-reporter");
+require('dotenv').config();
 const { POLYGON_KEY, MNEMONIC } = process.env;
-task("accounts", "Prints the list of accounts", async () => {
+task('accounts', 'Prints the list of accounts', async () => {
   const accounts = await ethers.getSigners();
 
   for (const account of accounts) {
@@ -12,24 +12,23 @@ task("accounts", "Prints the list of accounts", async () => {
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: 'hardhat',
   networks: {
     hardhat: {},
     polygonTestnet: {
-      url: "https://80002.rpc.thirdweb.com",
+      url: 'https://80002.rpc.thirdweb.com',
       accounts: [MNEMONIC],
     },
     matic: {
-      url: "https://polygon-rpc.com",
+      url: 'https://polygon-rpc.com',
       accounts: [MNEMONIC],
     },
-
   },
 
   solidity: {
     compilers: [
       {
-        version: "0.8.24",
+        version: '0.8.24',
         settings: {
           optimizer: {
             enabled: true,
@@ -42,14 +41,19 @@ module.exports = {
 
   // },
   paths: {
-    artifacts: "./artifacts",
-    sources: "./contracts",
-    cache: "./cache",
-    tests: "./test",
+    artifacts: './artifacts',
+    sources: './contracts',
+    cache: './cache',
+    tests: './test',
   },
   etherscan: {
     apiKey: {
       polygonAmoy: POLYGON_KEY,
     },
   },
+  gasReporter: {
+    currency: 'USD',
+    L1: "ethereum",
+    enabled: true
+  }
 };
