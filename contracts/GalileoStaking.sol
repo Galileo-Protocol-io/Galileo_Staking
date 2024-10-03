@@ -205,38 +205,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     LEOX = _leox;
   }
 
-  /**
-   * @dev Modifier to update the reward information for a specific token, collection address, and recipient.
-   * This ensures that the reward calculations are up-to-date before executing the main function logic.
-   *
-   * @param tokenId The ID of the staked token.
-   * @param collectionAddress The address of the NFT collection.
-   * @param recipient The address of the staker.
-   */
-  modifier updateReward(
-    uint256 tokenId,
-    address collectionAddress,
-    address recipient
-  ) {
-    // Update the stored reward per token for the collection to the current value.
-    state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
-
-    // Update the last update time for the collection to the current block timestamp.
-    state.lastUpdateTime[collectionAddress] = block.timestamp;
-
-    // If the recipient address is not zero, update their reward information.
-    if (recipient != address(0)) {
-      // Calculate and update the rewards for the recipient's specific token.
-      state.rewards[recipient][collectionAddress][tokenId] = calculateRewards(recipient, collectionAddress, tokenId);
-
-      // Update the amount of reward per token already paid to the recipient for the specific token.
-      state.userRewardPerTokenPaid[recipient][collectionAddress][tokenId] = state.rewardPerTokenStored[collectionAddress];
-    }
-
-    // Continue with the execution of the main function.
-    _;
-  }
-
   // ═══════════════════════ FUNCTIONS ════════════════════════
 
   /**
@@ -251,9 +219,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    *- stakedLeox The amount of LEOX tokens to be staked alongside the NFT.
    *- timelockEndTime The end time of the timelock for the stake (when the stake will be unlocked).
    */
-  function stake(
-    GalileoStakingStorage.StakeTokens calldata stakeTokens
-  ) public whenNotPaused nonReentrant updateReward(stakeTokens.tokenId, stakeTokens.collectionAddress, _msgSender()) {
+  function stake(GalileoStakingStorage.StakeTokens calldata stakeTokens) public whenNotPaused nonReentrant {
     // Recover and verify the voucher signature to ensure its authenticity.
     _recover(stakeTokens);
     // Call the internal function to handle the actual staking process
@@ -279,6 +245,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @param stakedLeox The amount of LEOX tokens to be staked alongside the NFT.
    */
   function _stakeTokens(address collectionAddress, uint256 tokenId, uint256 citizen, uint256 timelockEndTime, uint256 stakedLeox) internal {
+    //  This ensures that the reward calculations are up-to-date before executing the stake function logic.
+    _updateReward(tokenId, collectionAddress, _msgSender());
+
     // Check if the collection address is valid and initialized
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
@@ -420,11 +389,10 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @param tokenId The unique identifier of the staked NFT.
    * @param stakeMoreLeox The amount of additional LEOX tokens to be staked.
    */
-  function stakeLeoxTokens(
-    address collectionAddress,
-    uint256 tokenId,
-    uint256 stakeMoreLeox
-  ) public whenNotPaused nonReentrant updateReward(tokenId, collectionAddress, _msgSender()) {
+  function stakeLeoxTokens(address collectionAddress, uint256 tokenId, uint256 stakeMoreLeox) public whenNotPaused nonReentrant {
+    //  This ensures that the reward calculations are up-to-date before executing the stake leox tokens function logic.
+    _updateReward(tokenId, collectionAddress, _msgSender());
+
     // Ensure the collection address is not zero.
     if (collectionAddress == address(0)) revert GalileoStakingErrors.CollectionUninitialized();
 
@@ -1174,6 +1142,28 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
 
     // Return the paginated list of staked NFTs, current page number, and total number of pages
     return (paginatedStakes, pageNumber, totalPages);
+  }
+
+  /**
+   * @dev Internal function to update the reward information for a specific token ID, collection address, and recipient.
+   * This function calculates the latest reward per token and updates the reward and related state variables.
+   *
+   * @param tokenId The unique identifier of the token for which the reward is being updated.
+   * @param collectionAddress The address of the NFT collection that the token belongs to.
+   * @param recipient The address of the user who owns the token and is eligible for the reward.
+   */
+  function _updateReward(uint256 tokenId, address collectionAddress, address recipient) internal {
+    // Update the stored reward per token for the given collection
+    state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
+
+    // Update the last time the reward was calculated for the collection
+    state.lastUpdateTime[collectionAddress] = block.timestamp;
+
+    // Calculate and update the user's rewards for the specific token ID in the collection
+    state.rewards[recipient][collectionAddress][tokenId] = calculateRewards(recipient, collectionAddress, tokenId);
+
+    // Track the reward per token paid to the user so future rewards can be correctly calculated
+    state.userRewardPerTokenPaid[recipient][collectionAddress][tokenId] = state.rewardPerTokenStored[collectionAddress];
   }
 
   /**
