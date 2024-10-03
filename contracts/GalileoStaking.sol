@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
+import "hardhat/console.sol";
 
 contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -219,7 +220,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    *- stakedLeox The amount of LEOX tokens to be staked alongside the NFT.
    *- timelockEndTime The end time of the timelock for the stake (when the stake will be unlocked).
    */
-  function stake(GalileoStakingStorage.StakeTokens calldata stakeTokens) public whenNotPaused nonReentrant {
+  function stake(GalileoStakingStorage.StakeTokens calldata stakeTokens) external whenNotPaused nonReentrant {
     // Recover and verify the voucher signature to ensure its authenticity.
     _recover(stakeTokens);
     // Call the internal function to handle the actual staking process
@@ -327,7 +328,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @param rewardRate The new reward rate to be set for the upcoming reward window.
    * @param endTime The end time of the new reward window.
    */
-  function updateEmissionRate(address collectionAddress, uint256 rewardRate, uint256 endTime) public whenNotPaused onlyRole(ADMIN_ROLE) {
+  function updateEmissionRate(address collectionAddress, uint256 rewardRate, uint256 endTime) external whenNotPaused onlyRole(ADMIN_ROLE) {
     // Retrieve the total number of reward windows for the specified collection.
     uint256 totalRewardWindows = state.pools[collectionAddress].rewardCount;
 
@@ -389,7 +390,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @param tokenId The unique identifier of the staked NFT.
    * @param stakeMoreLeox The amount of additional LEOX tokens to be staked.
    */
-  function stakeLeoxTokens(address collectionAddress, uint256 tokenId, uint256 stakeMoreLeox) public whenNotPaused nonReentrant {
+  function stakeLeoxTokens(address collectionAddress, uint256 tokenId, uint256 stakeMoreLeox) external whenNotPaused nonReentrant {
     //  This ensures that the reward calculations are up-to-date before executing the stake leox tokens function logic.
     _updateReward(tokenId, collectionAddress, _msgSender());
 
@@ -632,7 +633,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    *
    * @param collectionAddress The address of the NFT collection.
    */
-  function withdrawAllRewards(address collectionAddress) public whenNotPaused nonReentrant {
+  function withdrawAllRewards(address collectionAddress) external whenNotPaused nonReentrant {
     // Call the internal function that handles the reward withdrawal logic.
     _withdrawAllRewards(collectionAddress);
   }
@@ -735,7 +736,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @param collectionAddress The address of the NFT collection contract to which the staked token belongs.
    * @param tokenId The unique identifier of the staked token to be unstaked.
    */
-  function unstake(address collectionAddress, uint256 tokenId) public whenNotPaused nonReentrant {
+  function unstake(address collectionAddress, uint256 tokenId) external whenNotPaused nonReentrant {
     // Validate the collection address to ensure it is not a zero address
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
@@ -769,6 +770,12 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
 
     // Ensure that the token is currently staked by checking its ID
     if (stakeInfo.tokenId != tokenId) revert GalileoStakingErrors.TokenNotStaked();
+
+    // Calculate the total lock period.
+    uint256 lockTimePeriod = stakeInfo.timelockStartTime + stakeInfo.timelockEndTime;
+
+    // Ensure that unstaking is not allowed until the lock period has passed.
+    if (block.timestamp < lockTimePeriod) revert GalileoStakingErrors.UnstakeBeforeLockPeriod(lockTimePeriod);
 
     // Withdraw any rewards associated with the staked token
     _withdrawRewards(recipient, collectionAddress, tokenId);
@@ -823,7 +830,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     address soulboundToken,
     uint256 tokenIdsCount,
     GalileoStakingStorage.StakeInfoInput[] calldata stakeInfo
-  ) public whenNotPaused onlyRole(ADMIN_ROLE) {
+  ) external whenNotPaused onlyRole(ADMIN_ROLE) {
     if (collectionAddress == address(0) || soulboundToken == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
     // Get the collection's name from the ERC721 contract
@@ -874,7 +881,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    */
   function configurePool(
     GalileoStakingStorage.PoolConfigurationInput[] memory poolConfigurationsInput
-  ) public whenNotPaused onlyRole(ADMIN_ROLE) {
+  ) external whenNotPaused onlyRole(ADMIN_ROLE) {
     // Iterate through each input in the array
     for (uint256 i; i < poolConfigurationsInput.length; ) {
       // Get the collection address
@@ -928,7 +935,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
   function setMultipliers(
     address collectionAddress,
     GalileoStakingStorage.Multiplier[] calldata multipliers
-  ) public whenNotPaused onlyRole(ADMIN_ROLE) {
+  ) external whenNotPaused onlyRole(ADMIN_ROLE) {
     // Check if the collection address is valid
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
@@ -950,7 +957,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    *
    * @param collectionAddress The address of the NFT collection whose tax is being withdrawn.
    */
-  function withdrawTax(address collectionAddress) public nonReentrant whenNotPaused onlyRole(ADMIN_ROLE) {
+  function withdrawTax(address collectionAddress) external nonReentrant whenNotPaused onlyRole(ADMIN_ROLE) {
     // Validate the collection address to ensure it is not a zero address
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
@@ -1033,7 +1040,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     address stakerAddress,
     address collectionAddress,
     uint256 tokenId
-  ) public view returns (GalileoStakingStorage.StakePerCitizen memory) {
+  ) external view returns (GalileoStakingStorage.StakePerCitizen memory) {
     // Ensure valid input addresses
     if (collectionAddress == address(0) || stakerAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
@@ -1061,7 +1068,11 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    */
   function getPoolConfiguration(
     address collectionAddress
-  ) public view returns (uint256 totalPoints, uint256 rewardCount, uint256 tax, GalileoStakingStorage.RewardWindow[] memory rewardWindows) {
+  )
+    external
+    view
+    returns (uint256 totalPoints, uint256 rewardCount, uint256 tax, GalileoStakingStorage.RewardWindow[] memory rewardWindows)
+  {
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
     // Retrieve the pool data for the specified collection address
     GalileoStakingStorage.PoolData memory pool = state.pools[collectionAddress];
@@ -1114,7 +1125,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     address collectionAddress, // Address of the specific collection to query
     uint256 pageNumber, // Page number for pagination (starts from 1)
     uint256 pageSize // Number of NFTs per page
-  ) public view returns (GalileoStakingStorage.StakePerCitizen[] memory, uint256, uint256) {
+  ) external view returns (GalileoStakingStorage.StakePerCitizen[] memory, uint256, uint256) {
     // Input validation to ensure page number starts from 1
     require(pageNumber > 0, "Page number starts from 1");
 
@@ -1273,7 +1284,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @dev Function to pause the contract
    * @notice Only callable by an address with the ADMIN_ROLE
    */
-  function pause() public onlyRole(ADMIN_ROLE) {
+  function pause() external onlyRole(ADMIN_ROLE) {
     // Internal function that triggers the paused state
     _pause();
   }
@@ -1282,7 +1293,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
    * @dev Function to unpause the contract
    * @notice Only callable by an address with the ADMIN_ROLE
    */
-  function unpause() public onlyRole(ADMIN_ROLE) {
+  function unpause() external onlyRole(ADMIN_ROLE) {
     // Internal function that lifts the paused state
     _unpause();
   }

@@ -97,7 +97,6 @@ describe('GalileoStaking', async function () {
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
       const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
-      
 
       const voucher = {
         collectionAddress: nebulaAddress,
@@ -1344,6 +1343,34 @@ describe('GalileoStaking', async function () {
       const adjustedRewards = rewardsInEther - rewardsInEther * 0.03;
 
       expect(adjustedRewards).to.be.equal(Number(unstake));
+    });
+
+    it('Should revert if user tries to unstake tokens before stake time period ends', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      let tokenId = 1;
+      let citizen = 1;
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
+      let signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      let voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await galileoStaking.connect(staker1).stake(voucher);
+
+      await expect(galileoStaking.connect(staker1).unstake(nebulaAddress, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'UnstakeBeforeLockPeriod'
+      );
     });
 
     it('Should revert if smart contract does not have reward tokens', async function () {
