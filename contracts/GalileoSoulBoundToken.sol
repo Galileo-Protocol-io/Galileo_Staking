@@ -21,7 +21,7 @@ contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable
     _baseTokenURI = baseTokenURI;
   }
 
-  function issue(address to) public onlyRole(ADMIN_ROLE) {
+  function issue(address to) external onlyRole(ADMIN_ROLE) {
     tokenId++;
     _safeMint(to, tokenId);
   }
