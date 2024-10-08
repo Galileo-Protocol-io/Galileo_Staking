@@ -765,6 +765,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     // Get the address of the sender, who is the recipient of the unstaked token
     address recipient = _msgSender();
 
+    //  This ensures that the reward calculations are up-to-date before executing the unstake function logic.
+    _updateReward(tokenId, collectionAddress, recipient);
+
     // Retrieve the staker's position for the specified token within the collection
     GalileoStakingStorage.StakePerCitizen memory stakeInfo = state.stakersPosition[recipient][collectionAddress][tokenId];
 
