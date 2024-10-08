@@ -51,4 +51,7 @@ library GalileoStakingErrors {
 
   // Error indicating that signature is invalid
   error InvalidSignature();
+
+// Error indicating that tax input value is more than 
+  error InvalidTaxRate();
 }

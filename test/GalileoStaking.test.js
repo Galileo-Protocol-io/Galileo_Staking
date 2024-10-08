@@ -998,6 +998,13 @@ describe('GalileoStaking', async function () {
 
       await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(galileoStaking, 'EnforcedPause');
     });
+
+    it('Should revert if tax is greater then 10', async function () {
+      let currentTime = Math.floor(Date.now() / 1000);
+      const poolInfo = [[nebulaAddress, parseEther('11'), [[rewardRate, currentTime, 0]]]];
+
+      await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(galileoStaking, 'InvalidTaxRate');
+    });
   });
 
   describe('Calculate Rewards', async function () {

@@ -60,6 +60,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
   /// A constant multiplier to reduce overflow in staking calculations.
   uint256 private constant PRECISION = 1 ether;
 
+  // Define a maximum tax rate of 10%
+  uint256 private constant MAX_TAX_LIMIT = 10 ether;
+
   // ═══════════════════════ EVENTS ════════════════════════
 
   /**
@@ -900,7 +903,13 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
       if (state.pools[collectionAddress].rewardCount > 0) delete state.pools[collectionAddress];
 
       // Set the tax for the pool
-      state.pools[collectionAddress].tax = poolConfigurationsInput[i].tax;
+      for (uint256 j; j < poolConfigurationsInput.length; ) {
+        if (poolConfigurationsInput[j].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
+        state.pools[collectionAddress].tax = poolConfigurationsInput[j].tax;
+        unchecked {
+          j++;
+        }
+      }
 
       // Get the number of reward windows for the current input
       uint256 poolRewardWindowCount = poolConfigurationsInput[i].rewardWindows.length;
