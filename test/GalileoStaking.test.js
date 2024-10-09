@@ -380,7 +380,10 @@ describe('GalileoStaking', async function () {
 
       // Stake NFT and LEOX
 
-      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWith('Token transfer failed'); // Specify the expected address in the error
+      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWithCustomError(
+        erc721Token,
+        "ERC721IncorrectOwner"
+      ); // Specify the expected address in the error
     });
 
     it('Should stake with zero leox', async function () {
@@ -1427,7 +1430,10 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      await expect(galileoStaking.connect(staker1).unstake(nebulaAddress, 1)).to.be.revertedWith('Tokens transfer failed');
+      await expect(galileoStaking.connect(staker1).unstake(nebulaAddress, 1)).to.be.revertedWithCustomError(
+        erc20Token,
+        "ERC20InsufficientBalance"
+      );
     });
 
     it('Should revert if collection address is invalid', async function () {
