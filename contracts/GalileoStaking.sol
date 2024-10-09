@@ -353,9 +353,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     // Get the current time.
     uint256 startTime = block.timestamp;
 
-    // Set the share per window for the next reward window based on the total points in the pool.
-    state.sharePerWindow[collectionAddress][updateIndex + 1] = pool.totalPoints;
-
     // Ensure that the reward rate window is active window
     if (pool.rewardWindows[updateIndex - 1].startTime > startTime) revert GalileoStakingErrors.InvalidTime();
 
