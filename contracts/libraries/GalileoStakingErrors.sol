@@ -52,6 +52,12 @@ library GalileoStakingErrors {
   // Error indicating that signature is invalid
   error InvalidSignature();
 
-// Error indicating that tax input value is more than 
+  // Error indicating that tax input value is more than
   error InvalidTaxRate();
+
+  // Error indicating that LEOX hierarchy is invalid in configure collection
+  error InvalidLeoxHierarchy();
+
+  // Error indicating that Yield Trait Points hierarchy is invalid in configure collection
+  error InvalidTraitPointsHierarchy();
 }

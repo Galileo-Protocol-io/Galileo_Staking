@@ -599,6 +599,7 @@ describe('GalileoStaking', async function () {
         'CollectionUninitialized'
       );
     });
+    
 
     it('Should revert if reward rate is zero', async function () {
       await expect(galileoStaking.updateEmissionRate(nebulaAddress, 0, 0)).to.be.revertedWithCustomError(
@@ -750,6 +751,26 @@ describe('GalileoStaking', async function () {
       ];
       await expect(galileoStaking.connect(admin).configureNewCollection(nebulaAddress, sbtAddress, totalNebulaSupply, stakeInfo)).to.not
         .reverted;
+    });
+
+    it('Should revert if Leox hierarchy is invalid', async function () {
+      const stakeInfo = [
+        [parseEther('3000'), yieldTraitPointC1],
+        [parseEther('4000'), yieldTraitPointC2],
+      ];
+      await expect(
+        galileoStaking.connect(admin).configureNewCollection(nebulaAddress, sbtAddress, totalNebulaSupply, stakeInfo)
+      ).to.be.revertedWithCustomError(galileoStaking, 'InvalidLeoxHierarchy');
+    });
+
+    it('Should revert if Yeild Trait Points hierarchy is invalid', async function () {
+      const stakeInfo = [
+        [parseEther('5000'), 3],
+        [parseEther('4000'), 4],
+      ];
+      await expect(
+        galileoStaking.connect(admin).configureNewCollection(nebulaAddress, sbtAddress, totalNebulaSupply, stakeInfo)
+      ).to.be.revertedWithCustomError(galileoStaking, 'InvalidTraitPointsHierarchy');
     });
 
     it('Should revert if max leox is zero', async function () {

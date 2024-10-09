@@ -859,6 +859,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
     for (uint256 i = 0; i < stakeInfo.length; i++) {
       if (stakeInfo[i].maxLeox == 0 || stakeInfo[i].yieldTraitPoints == 0) revert GalileoStakingErrors.InvalidInput();
 
+      // Check that the maxLeox and yieldTraitPoints follow a consistent hierarchy
+      if (i > 0) {
+        // Ensure that maxLeox does not decrease compared to the previous tier
+        if (stakeInfo[i].maxLeox > stakeInfo[i - 1].maxLeox) revert GalileoStakingErrors.InvalidLeoxHierarchy();
+
+        // Ensure that yieldTraitPoints do not decrease compared to the previous tier
+        if (stakeInfo[i].yieldTraitPoints > stakeInfo[i - 1].yieldTraitPoints) revert GalileoStakingErrors.InvalidTraitPointsHierarchy();
+      }
+
       // Create a new stake info object
       GalileoStakingStorage.StakeInfo memory newStakeInfo = GalileoStakingStorage.StakeInfo(
         stakeInfo[i].maxLeox, // Maximum LEOX reward for this tier
@@ -869,7 +878,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard {
       // Append the new staking info to the existing array for this collection
       state.stakeTokensInfo[collectionAddress].push(newStakeInfo);
     }
-
     // Update total supply
     totalSupply += tokenIdsCount;
 
