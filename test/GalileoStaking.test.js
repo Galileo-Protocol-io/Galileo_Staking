@@ -1508,6 +1508,92 @@ describe('GalileoStaking', async function () {
     });
   });
 
+  describe('Emergency Unstake Tokens and does not get rewards', function () {
+    it('Should allow user to emergency unstake tokens without get rewards', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      let tokenId = 1;
+      let citizen = 1;
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
+
+      await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
+
+      const stakerLeoxBalanceBefore = await erc20Token.balanceOf(staker1.address);
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
+      let signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      let voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await galileoStaking.connect(staker1).stake(voucher);
+
+      await ethers.provider.send('evm_increaseTime', [stakeTime]);
+      await ethers.provider.send('evm_mine');
+
+      await erc721Token.mint(staker1.address); // Mint NFT to staker1
+
+      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, tokenId);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
+      signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await galileoStaking.connect(staker1).stake(voucher);
+
+      await ethers.provider.send('evm_increaseTime', [stakeTime]);
+      await ethers.provider.send('evm_mine');
+
+      let unstake = await (await galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 1)).wait();
+
+      const stakerLeoxBalanceAfter = await erc20Token.balanceOf(staker1.address);
+
+      const stakerBalance = stakerLeoxBalanceBefore - stakeLeoxAmount; // unstake  nft, it minus the one nft
+      expect(unstake.logs[3].args[4]).to.be.equal(stakeLeoxAmount);
+      expect(stakerLeoxBalanceAfter).to.be.equal(stakerBalance);
+    });
+
+    it('Should revert if collection address is invalid', async function () {
+      await expect(galileoStaking.connect(staker1).emergencyUnstake(ethers.ZeroAddress, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAddress'
+      );
+    });
+
+    it('Should revert if token id is invalid', async function () {
+      await expect(galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 0)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidTokenId'
+      );
+    });
+
+    it('Should revert if token id is not staked', async function () {
+      await expect(galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 5)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'TokenNotStaked'
+      );
+    });
+  });
+
   describe('Get Staked information in pagination', function () {
     it('Should return the expected record in pagination', async function () {
       let stakeTimeInPool = 10;

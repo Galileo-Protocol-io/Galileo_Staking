@@ -165,6 +165,23 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   );
 
   /**
+   * @dev Event emitted when a recipient unstake Tokens and get rewards for a staked NFT
+   *
+   * @param collectionAddress Address of the collection the NFT belongs to.
+   * @param recipient Address of the recipient who withdrew the rewards
+   * @param tokenId The ID of the token to which more tokens are staked.
+   * @param points Points associated with the staked token.
+   * @param totalLeox Amount of LEOX tokens unstaked with the token.
+   */
+  event EmergencyUnstakeToken(
+    address indexed collectionAddress,
+    address indexed recipient,
+    uint256 indexed tokenId,
+    uint256 points,
+    uint256 totalLeox
+  );
+
+  /**
    * @dev Emitted when the emission rate is updated for a specific collection.
    *
    * @param collectionAddress The address of the collection contract for which the emission rate is updated.
@@ -758,12 +775,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param tokenId The unique identifier of the staked token to be unstaked.
    */
   function unstake(address collectionAddress, uint256 tokenId) external whenNotPaused nonReentrant {
-    // Validate the collection address to ensure it is not a zero address
-    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
-
-    // Validate the token ID to ensure it is greater than zero
-    if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
-
     // Call the internal function to handle the unstaking process
     _unstake(collectionAddress, tokenId);
   }
@@ -783,11 +794,14 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param tokenId The ID of the token that is being unstaked.
    */
   function _unstake(address collectionAddress, uint256 tokenId) internal {
+    // Validate the collection address to ensure it is not a zero address
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Validate the token ID to ensure it is greater than zero
+    if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
+
     // Get the address of the sender, who is the recipient of the unstaked token
     address recipient = _msgSender();
-
-    //  This ensures that the reward calculations are up-to-date before executing the unstake function logic.
-    _updateReward(tokenId, collectionAddress, recipient);
 
     // Retrieve the staker's position for the specified token within the collection
     GalileoStakingStorage.StakePerCitizen memory stakeInfo = state.stakersPosition[recipient][collectionAddress][tokenId];
@@ -800,6 +814,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Ensure that unstaking is not allowed until the lock period has passed.
     if (block.timestamp < lockTimePeriod) revert GalileoStakingErrors.UnstakeBeforeLockPeriod(lockTimePeriod);
+
+    //  This ensures that the reward calculations are up-to-date before executing the unstake function logic.
+    _updateReward(tokenId, collectionAddress, recipient);
 
     // Withdraw any rewards associated with the staked token
     _withdrawRewards(recipient, collectionAddress, tokenId);
@@ -840,6 +857,91 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Emit an event to notify that the token has been unstaked
     emit UnstakeToken(collectionAddress, recipient, tokenId, points, stakeInfo.stakedLEOX);
+  }
+
+  /**
+   * @dev Emergency Unstake Tokens a previously staked token without claims any associated rewards.
+   *
+   * This function performs the following operations:
+   * - Validates the collection address and token ID.
+   * - Calls the internal `_emergencyUnstake` function to handle the actual unstaking process.
+   *
+   * @param collectionAddress The address of the NFT collection contract to which the staked token belongs.
+   * @param tokenId The unique identifier of the staked token to be unstaked.
+   */
+  function emergencyUnstake(address collectionAddress, uint256 tokenId) external nonReentrant {
+    // Call the internal function to handle the unstaking process
+    _emergencyUnstake(collectionAddress, tokenId);
+  }
+
+  /**
+   * @dev Internal function to emergency unstake tokens, does not withdraw rewards, and return staked assets.
+   *
+   * This function handles the complete process of unstaking a token, which includes:
+   * - Validating that the token is indeed staked.
+   * - Adjusting the pool's total points.
+   * - Updating and cleaning up the staker's information.
+   * - Burning the Soul Bound Token if applicable.
+   * - Transferring the token and staked LEOX tokens back to the recipient.
+   *
+   * @param collectionAddress The address of the collection contract from which the token is staked.
+   * @param tokenId The ID of the token that is being unstaked.
+   */
+  function _emergencyUnstake(address collectionAddress, uint256 tokenId) internal {
+    // Validate the collection address to ensure it is not a zero address
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Validate the token ID to ensure it is greater than zero
+    if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
+
+    // Get the address of the sender, who is the recipient of the unstaked token
+    address recipient = _msgSender();
+
+    // Retrieve the staker's position for the specified token within the collection
+    GalileoStakingStorage.StakePerCitizen memory stakeInfo = state.stakersPosition[recipient][collectionAddress][tokenId];
+
+    // Ensure that the token is currently staked by checking its ID
+    if (stakeInfo.tokenId != tokenId) revert GalileoStakingErrors.TokenNotStaked();
+
+    //  This ensures that the reward calculations are up-to-date before executing the unstake function logic.
+    _updateReward(tokenId, collectionAddress, recipient);
+
+    // Calculate the points to be subtracted from the pool's total points
+    uint256 points = stakeInfo.points;
+
+    // Update the pool's total points by subtracting the points of the unstaked token
+    state.pools[collectionAddress].totalPoints -= points;
+
+    // Remove the staker's position record for the token
+    delete state.stakersPosition[recipient][collectionAddress][tokenId];
+    delete state.lastRewardTime[recipient][collectionAddress][tokenId];
+
+    // Retrieve the index of the token in the staked NFTs array
+    uint256 index = state.stakedNFTIndex[recipient][collectionAddress][tokenId];
+    uint256 lastIndex = state.stakedNFTs[recipient][collectionAddress].length - 1;
+
+    if (index != lastIndex) {
+      // Swap the token to be removed with the last element in the array
+      GalileoStakingStorage.StakePerCitizen memory lastStakeInfo = state.stakedNFTs[recipient][collectionAddress][lastIndex];
+      state.stakedNFTs[recipient][collectionAddress][index] = lastStakeInfo;
+      state.stakedNFTIndex[recipient][collectionAddress][lastStakeInfo.tokenId] = index;
+    }
+
+    // Remove the last element from the staked NFTs array
+    state.stakedNFTs[recipient][collectionAddress].pop();
+    delete state.stakedNFTIndex[recipient][collectionAddress][tokenId];
+
+    // Burn the Soul Bound Token associated with the unstaked token
+    _burnSoulBoundToken(collectionAddress, tokenId);
+
+    // Transfer the unstaked token back to the recipient
+    IERC721(collectionAddress).safeTransferFrom(address(this), recipient, tokenId);
+
+    // Transfer the staked LEOX tokens back to the recipient
+    IERC20(LEOX).safeTransfer(recipient, stakeInfo.stakedLEOX);
+
+    // Emit an event to notify that the token has been unstaked
+    emit EmergencyUnstakeToken(collectionAddress, recipient, tokenId, points, stakeInfo.stakedLEOX);
   }
 
   /**
