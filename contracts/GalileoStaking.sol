@@ -674,29 +674,28 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Get the current time
     uint256 currentTime = block.timestamp;
 
-    totalRewardAmount = calculateRewardsAllRewards(recipient, collectionAddress);
+    // Update the reward per token stored value for the collection to the most current value.
+    state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
+
+    // Update the last update time for the collection to the current block timestamp.
+    state.lastUpdateTime[collectionAddress] = currentTime;
 
     // Loop through each staked NFT token in the collection.
     for (uint256 i = 0; i < stakedNFTs.length; i++) {
       // Extract the token ID of the staked NFT.
       uint256 tokenId = stakedNFTs[i].tokenId;
 
-      // Calculate the rewards for the specific token ID by calling the `calculateRewards` function.
+      // Calculate the rewards once per token ID
+      uint256 rewards = calculateRewards(recipient, collectionAddress, tokenId);
 
-      // Temporarily store the calculated rewards for this token ID in the rewards mapping.
-      state.rewards[recipient][collectionAddress][tokenId] = calculateRewards(recipient, collectionAddress, tokenId);
-
-      // Update the reward per token stored value for the collection to the most current value.
-      state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
-
-      // Update the last update time for the collection to the current block timestamp.
-      state.lastUpdateTime[collectionAddress] = currentTime;
-
-      // Reset the rewards mapping for this token ID to zero since we are withdrawing them.
+      // Reset the reward mapping for this token ID
       state.rewards[recipient][collectionAddress][tokenId] = 0;
 
-      // Update the user's paid reward per token to reflect the latest stored reward per token for the collection.
+      // Update the user's paid reward per token to reflect the latest value
       state.userRewardPerTokenPaid[recipient][collectionAddress][tokenId] = state.rewardPerTokenStored[collectionAddress];
+
+      // Accumulate rewards for final transfer
+      totalRewardAmount += rewards;
     }
 
     // If the reward is zero, revert the transaction with an InvalidAmount error.

@@ -53,10 +53,6 @@ describe('GalileoStaking', async function () {
     await soulBounToken.grantRole(ADMIN_ROLE, galileoStakingAddress);
     await galileoStaking.connect(admin).grantRole(VALIDATOR_ROLE, admin.address);
 
-    tokenArray1 = createTokenArray(1, 200);
-
-    tokenArray2 = createTokenArray(201, 300);
-
     const stakeInfo = [
       [parseEther('5000'), yieldTraitPointC1],
       [parseEther('4000'), yieldTraitPointC2],
@@ -380,10 +376,7 @@ describe('GalileoStaking', async function () {
 
       // Stake NFT and LEOX
 
-      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWithCustomError(
-        erc721Token,
-        "ERC721IncorrectOwner"
-      ); // Specify the expected address in the error
+      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWithCustomError(erc721Token, 'ERC721IncorrectOwner'); // Specify the expected address in the error
     });
 
     it('Should stake with zero leox', async function () {
@@ -602,7 +595,6 @@ describe('GalileoStaking', async function () {
         'CollectionUninitialized'
       );
     });
-    
 
     it('Should revert if reward rate is zero', async function () {
       await expect(galileoStaking.updateEmissionRate(nebulaAddress, 0, 0)).to.be.revertedWithCustomError(
@@ -1139,6 +1131,10 @@ describe('GalileoStaking', async function () {
       const tokenId = 1;
       const citizen = 1;
 
+      const timeStake = 60;
+
+      await erc20Token.transfer(galileoStakingAddress, parseEther('1000'));
+
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1148,7 +1144,7 @@ describe('GalileoStaking', async function () {
         collectionAddress: nebulaAddress,
         tokenId: tokenId,
         citizen: citizen,
-        timelockEndTime: stakeTime,
+        timelockEndTime: timeStake,
         stakedLeox: stakeLeoxAmount,
         signature: signature,
       };
@@ -1156,7 +1152,7 @@ describe('GalileoStaking', async function () {
       // Stake NFT and LEOX
       await galileoStaking.connect(staker1).stake(voucher);
 
-      await ethers.provider.send('evm_increaseTime', [stakeTime]);
+      await ethers.provider.send('evm_increaseTime', [timeStake]);
       await ethers.provider.send('evm_mine');
 
       // Mock reward setup and accumulation
@@ -1432,7 +1428,7 @@ describe('GalileoStaking', async function () {
 
       await expect(galileoStaking.connect(staker1).unstake(nebulaAddress, 1)).to.be.revertedWithCustomError(
         erc20Token,
-        "ERC20InsufficientBalance"
+        'ERC20InsufficientBalance'
       );
     });
 
