@@ -915,13 +915,8 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       if (state.pools[collectionAddress].rewardCount > 0) delete state.pools[collectionAddress];
 
       // Set the tax for the pool
-      for (uint256 j; j < poolConfigurationsInput.length; ) {
-        if (poolConfigurationsInput[j].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
-        state.pools[collectionAddress].tax = poolConfigurationsInput[j].tax;
-        unchecked {
-          j++;
-        }
-      }
+      if (poolConfigurationsInput[i].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
+      state.pools[collectionAddress].tax = poolConfigurationsInput[i].tax;
 
       // Get the number of reward windows for the current input
       uint256 poolRewardWindowCount = poolConfigurationsInput[i].rewardWindows.length;
