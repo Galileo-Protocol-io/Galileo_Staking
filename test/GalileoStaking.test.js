@@ -1133,8 +1133,8 @@ describe('GalileoStaking', async function () {
 
       const timeStake = 60;
 
-      await erc20Token.transfer(galileoStakingAddress, parseEther('1000'));
-
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1177,6 +1177,8 @@ describe('GalileoStaking', async function () {
     });
 
     it('Should revert if no token id is staked', async function () {
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
       await expect(galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).to.be.revertedWithCustomError(
         galileoStaking,
         'TokenNotStaked'
@@ -1198,6 +1200,9 @@ describe('GalileoStaking', async function () {
       const stakeLeoxAmount = parseEther('100');
       const tokenId = 1;
       const citizen = 1;
+
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
@@ -1243,6 +1248,9 @@ describe('GalileoStaking', async function () {
       const tokenId = 1;
       const citizen = 1;
 
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
+
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1283,6 +1291,9 @@ describe('GalileoStaking', async function () {
     });
 
     it('Should revert if collection address is invalid', async function () {
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
+
       await expect(galileoStaking.connect(admin).withdrawTax(ethers.ZeroAddress)).to.be.revertedWithCustomError(
         galileoStaking,
         'InvalidAddress'
@@ -1310,11 +1321,45 @@ describe('GalileoStaking', async function () {
     });
   });
 
+  describe('Deposit Rewards', function () {
+    it('Should deposit tokens by Admin', async function () {
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await expect(galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'))).to.not.be.reverted;
+    });
+
+    it('Should get the correct data after deposit tokens by Admin', async function () {
+      const depositRewardTokens = parseEther('1000');
+      await erc20Token.connect(admin).approve(galileoStakingAddress, depositRewardTokens);
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, depositRewardTokens);
+
+      const getRewardTokensCount = await galileoStaking.getRewardPoolBalance(nebulaAddress);
+      expect(getRewardTokensCount).to.be.equal(depositRewardTokens);
+    });
+
+    it('Should get the correct data after deposit tokens by Admin', async function () {
+      const depositRewardTokens = parseEther('1000');
+      await erc20Token.connect(admin).approve(galileoStakingAddress, depositRewardTokens);
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, depositRewardTokens);
+
+      const getRewardTokensCount = await galileoStaking.getRewardPoolBalance(nebulaAddress);
+      expect(getRewardTokensCount).to.be.equal(depositRewardTokens);
+    });
+
+    it('Should not deposit tokens by non-Admin', async function () {
+      await expect(galileoStaking.connect(staker1).depositRewards(nebulaAddress, parseEther('1000'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'AccessControlUnauthorizedAccount'
+      );
+    });
+  });
+
   describe('Unstake Tokens and get rewards', function () {
     it('Should allow user to unstake tokens get rewards', async function () {
       const stakeLeoxAmount = parseEther('100');
       let tokenId = 1;
       let citizen = 1;
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
@@ -1427,8 +1472,8 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_mine');
 
       await expect(galileoStaking.connect(staker1).unstake(nebulaAddress, 1)).to.be.revertedWithCustomError(
-        erc20Token,
-        'ERC20InsufficientBalance'
+        galileoStaking,
+        'InvalidAmountRewardPoolBalance'
       );
     });
 
@@ -1576,11 +1621,3 @@ describe('GalileoStaking', async function () {
     });
   });
 });
-
-const createTokenArray = (start, end) => {
-  let array = [];
-  for (let i = start; i <= end; i++) {
-    array.push(i);
-  }
-  return array;
-};

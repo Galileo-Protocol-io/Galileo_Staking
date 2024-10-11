@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
+import "hardhat/console.sol";
 
 contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IERC721Receiver {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -181,6 +182,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    */
   event WithdrawTax(address collectionAddress, address recipient, uint256 taxAmount);
 
+  event DepositRewards(address collectionAddress, uint256 leoxAmount);
   /**
    * @dev Emitted when a pool is configured or updated.
    *
@@ -627,8 +629,17 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Revert the transaction if the reward amount after tax is zero.
     if (rewardsAfterTax == 0) revert GalileoStakingErrors.InvalidAmount(rewardsAfterTax);
 
+    // Get available rewards for the collection
+    uint256 poolRewardTokenAmount = state.rewardPool[collectionAddress];
+
+    // Revert the transaction if the reward token amount in the pool is less than reward value.
+    if (poolRewardTokenAmount <= rewardsAfterTax) revert GalileoStakingErrors.InvalidAmountRewardPoolBalance();
+
     // Reset the reward balance for this token and collection to zero after withdrawal.
     state.rewards[recipient][collectionAddress][tokenId] = 0;
+
+    // Deduct the reward amount after tax from the pool
+    poolRewardTokenAmount -= rewardsAfterTax;
 
     // Transfer the net reward amount (after tax) to the recipient.
     IERC20(LEOX).safeTransfer(recipient, rewardsAfterTax);
@@ -1000,6 +1011,39 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Emit an event to log the tax withdrawal operation
     emit WithdrawTax(collectionAddress, recipient, taxAmount);
+  }
+
+  /**
+   * @dev Allows ADMIN_ROLE to deposit LEOX tokens into the reward pool for a specific collection.
+   *
+   * @param collectionAddress The address of the collection whose reward pool will be credited.
+   * @param leoxAmount The amount of LEOX tokens to deposit into the reward pool.
+   */
+  function depositRewards(address collectionAddress, uint256 leoxAmount) external onlyRole(ADMIN_ROLE) {
+    // Revert the transaction if the leox token is zero.
+    if (leoxAmount <= 0) revert GalileoStakingErrors.InvalidAmount(leoxAmount);
+
+    // Revert the transaction if the input collectionAddress is zero address.
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Transfer LEOX tokens to the reward pool
+    IERC20(LEOX).safeTransferFrom(_msgSender(), address(this), leoxAmount);
+
+    // Add transferred amount to the collection's reward pool
+    state.rewardPool[collectionAddress] += leoxAmount;
+
+    // Emit an event for the reward deposit
+    emit DepositRewards(collectionAddress, leoxAmount);
+  }
+
+  /**
+   * @notice Returns the current reward pool balance for a specific collection.
+   * @param collectionAddress The address of the collection to query.
+   * @return The amount of LEOX tokens available in the reward pool for the specified collection.
+   */
+  function getRewardPoolBalance(address collectionAddress) external view returns (uint256) {
+    // Return the reward pool balance for the given collection
+    return state.rewardPool[collectionAddress];
   }
 
   /**

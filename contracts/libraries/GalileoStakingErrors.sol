@@ -34,8 +34,13 @@ library GalileoStakingErrors {
   // Error indicating that a token is already staked
   error TokenAlreadyStaked();
 
-  // Error indicating that the amount is zero
+  // Error indicating that the pool doesn't have reward amount
+  error InvalidAmountRewardPoolBalance();
+
+  // Error indicating that the input amount is zero
   error InvalidAmount(uint256 amount);
+
+  error Insufficient();
 
   // Error indicating that the owner is incorrect
   error IncorrectOwner();
