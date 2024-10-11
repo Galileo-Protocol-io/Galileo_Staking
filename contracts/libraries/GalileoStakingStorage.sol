@@ -127,8 +127,6 @@ library GalileoStakingStorage {
     mapping(address => uint256) erc721Staked;
     // Mapping to store the last reward time for users
     mapping(address => mapping(address => mapping(uint256 => uint256))) lastRewardTime;
-    // Mapping to store share per reward window
-    mapping(address => mapping(uint256 => uint256)) sharePerWindow;
     // Tracks total rewards per collection
     mapping(address => uint256) rewardPool;
   }
