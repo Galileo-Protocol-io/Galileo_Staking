@@ -1244,22 +1244,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   }
 
   /**
-		A private helper function for performing the low-level call to `transfer` 
-		on some amount of ERC-20 tokens or ERC-721 token.
-
-		@param asset The address of the asset to perform the transfer call on.
-		@param to The address to attempt to transfer the asset to.
-		@param idOrAmount The amount of ERC-20 tokens or ERC-721 token id to attempt to transfer.
-	*/
-  function _assetTransfer(address asset, address to, uint256 idOrAmount) private {
-    // Encode function call data for the asset's transfer function
-    (bool success, bytes memory data) = asset.call(abi.encodeWithSelector(_TRANSFER_SELECTOR, to, idOrAmount));
-
-    // Revert if the low-level call fails.
-    if (!success) revert("Tokens transfer failed");
-  }
-
-  /**
    * @dev Function to issue the SBT to the staker at stake time.
    *
    * @param stakerAddress The address of the staker's wallet.
