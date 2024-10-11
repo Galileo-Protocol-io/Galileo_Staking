@@ -87,8 +87,8 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakedLEOX  Amount of LEOX tokens staked with the token.
    */
   event StakeTokens(
-    address collectionAddress,
-    uint256 tokenId,
+    address indexed collectionAddress,
+    uint256 indexed tokenId,
     uint256 citizen,
     uint256 timelockEndTime,
     uint256 points,
@@ -104,13 +104,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param newPoints The updated points after adding more tokens.
    * @param totalLeox The total amount of LEOX tokens staked after adding more tokens.
    */
-  event StakeLeoxTokens(
-    address indexed collectionAddress,
-    uint256 indexed tokenId,
-    uint256 indexed citizen,
-    uint256 newPoints,
-    uint256 totalLeox
-  );
+  event StakeLeoxTokens(address indexed collectionAddress, uint256 indexed tokenId, uint256 citizen, uint256 newPoints, uint256 totalLeox);
 
   /**
    * @dev  Event emitted when multipliers are set for a collection.
@@ -118,7 +112,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param collectionAddress The address of the collection contract.
    * @param multipliers Multipliers based on staking time period.
    */
-  event SetMultipliers(address collectionAddress, GalileoStakingStorage.Multiplier[] multipliers);
+  event SetMultipliers(address indexed collectionAddress, GalileoStakingStorage.Multiplier[] multipliers);
 
   /**
    * @dev Event emitted when a recipient withdraws rewards for a staked NFT
@@ -132,7 +126,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   event WithdrawRewards(
     address indexed collectionAddress,
     address indexed recipient,
-    uint256 tokenId,
+    uint256 indexed tokenId,
     uint256 rewardAmount,
     uint256 currentTime
   );
@@ -145,7 +139,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param rewardAmount Amount of rewards of all tokens withdrawn.
    * @param currentTime Timestamp of the withdrawal.
    */
-  event WithdrawAllRewards(address indexed collectionAddress, address indexed recipient, uint256 rewardAmount, uint256 currentTime);
+  event WithdrawAllRewards(address indexed collectionAddress, address indexed recipient, uint256 indexed rewardAmount, uint256 currentTime);
 
   /**
    * @dev Event emitted when a recipient unstake Tokens and get rewards for a staked NFT
@@ -188,7 +182,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param rewardRate The new reward rate set for the collection.
    * @param endTimePreviousRewardWindow The end time of the previous reward window before the emission rate update.
    */
-  event UpdateEmissionRate(address indexed collectionAddress, uint256 rewardRate, uint256 endTimePreviousRewardWindow);
+  event UpdateEmissionRate(address indexed collectionAddress, uint256 indexed rewardRate, uint256 endTimePreviousRewardWindow);
 
   /**
    * @dev Emitted when tax is withdrawn from a collection.
@@ -197,9 +191,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param recipient The address of the recipient who receives the withdrawn tax amount.
    * @param taxAmount The total amount of tax withdrawn from the collection.
    */
-  event WithdrawTax(address collectionAddress, address recipient, uint256 taxAmount);
+  event WithdrawTax(address indexed collectionAddress, address indexed recipient, uint256 indexed taxAmount);
 
-  event DepositRewards(address collectionAddress, uint256 leoxAmount);
+  /**
+   * @dev Emitted when rewards are deposited into the reward pool for a specific NFT collection.
+   *
+   * @param collectionAddress The address of the NFT collection for which rewards are being deposited.
+   * @param leoxAmount The amount of LEOX tokens deposited as rewards.
+   */
+  event DepositRewards(address indexed collectionAddress, uint256 indexed leoxAmount);
   /**
    * @dev Emitted when a pool is configured or updated.
    *
@@ -207,7 +207,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param tax The tax rate applied to the pool for the collection.
    * @param rewardWindows An array of reward windows configured for the pool.
    */
-  event ConfigurePool(address collectionAddress, uint256 tax, GalileoStakingStorage.RewardWindow[] rewardWindows);
+  event ConfigurePool(address indexed collectionAddress, uint256 indexed tax, GalileoStakingStorage.RewardWindow[] rewardWindows);
 
   // ═══════════════════════ CONSTRUCTOR ════════════════════════
 

@@ -11,11 +11,9 @@ contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable
   uint256 private tokenId;
   string private _baseTokenURI;
 
-  constructor(
-    string memory name,
-    string memory symbol,
-    string memory baseTokenURI
-  ) ERC721(name, symbol) Ownable(_msgSender()) {
+  event SetBaseURI(string indexed baseTokenURI);
+
+  constructor(string memory name, string memory symbol, string memory baseTokenURI) ERC721(name, symbol) Ownable(_msgSender()) {
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     _grantRole(ADMIN_ROLE, _msgSender());
     _baseTokenURI = baseTokenURI;
@@ -34,6 +32,7 @@ contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable
   // Function to set a new base URI
   function setBaseURI(string memory baseTokenURI) external onlyOwner {
     _baseTokenURI = baseTokenURI;
+    emit SetBaseURI(baseTokenURI);
   }
 
   function burn(uint256 _tokenId) public override onlyRole(ADMIN_ROLE) {
