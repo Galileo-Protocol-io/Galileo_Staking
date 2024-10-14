@@ -603,21 +603,6 @@ describe('GalileoStaking', async function () {
       );
     });
 
-    it('Should revert if start time is less then the start time of previous reward window', async function () {
-      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
-
-      let currentTime = Math.floor(Date.now() / 1000) + 1000000000;
-      const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
-
-      await (await GalileoStakings.connect(admin).configurePool(poolInfo)).wait();
-
-      await expect(GalileoStakings.updateEmissionRate(nebulaAddress, parseEther('10'), 0)).to.be.revertedWithCustomError(
-        GalileoStakings,
-        'InvalidTime'
-      );
-    });
-
     it('Should revert if non-admin tries to update the reward rate', async function () {
       await expect(galileoStaking.connect(staker1).updateEmissionRate(nebulaAddress, parseEther('10'), 0)).to.be.revertedWithCustomError(
         galileoStaking,
@@ -981,6 +966,28 @@ describe('GalileoStaking', async function () {
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
 
       await GalileoStakings.connect(admin).configurePool(poolInfo);
+    });
+
+    it('Should revert configure pool with multiple reward windows', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
+      let currentTime = Math.floor(Date.now() / 1000);
+      const poolInfo = [
+        [
+          nebulaAddress,
+          parseEther('3'),
+          [
+            [rewardRate, currentTime, 0],
+            [rewardRate, currentTime, 0],
+          ],
+        ],
+      ];
+
+      await expect(GalileoStakings.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'MultipleRewardWindowsNotAllowed'
+      );
     });
 
     it('Should revert configures of pool if pool configurations are already exists', async function () {

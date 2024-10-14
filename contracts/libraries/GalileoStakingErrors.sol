@@ -19,6 +19,9 @@ library GalileoStakingErrors {
   // Error indicating that a pool associated with a collection has been already initialized
   error PoolAlreadyInitialized();
 
+// Error indicating that multiple reward windows detected at pool config input
+  error MultipleRewardWindowsNotAllowed();
+
   // Error indicating an invalid count of tokens
   error InvalidTokensCount(uint256 maxLeox);
 

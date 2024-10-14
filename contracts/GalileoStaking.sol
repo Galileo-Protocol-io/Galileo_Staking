@@ -388,32 +388,24 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     GalileoStakingStorage.PoolData storage pool = state.pools[collectionAddress];
 
     // Determine the index for the new reward window.
-    uint256 updateIndex = pool.rewardWindows.length;
+    uint256 lastIndex = pool.rewardWindows.length - 1;
 
-    // Get the current time.
+    // Set start time to current block timestamp
     uint256 startTime = block.timestamp;
 
-    // Ensure that the reward rate window is active window
-    if (pool.rewardWindows[updateIndex - 1].startTime > startTime) revert GalileoStakingErrors.InvalidTime();
+    // Close the last reward window by setting its end time
+    pool.rewardWindows[lastIndex].endTime = startTime;
 
-    // Update the end time of the current (last) reward window to the start time of the new reward window.
-    pool.rewardWindows[updateIndex - 1].endTime = startTime;
-
-    // Set the last update time for the collection to the start time of the new reward window.
-    state.lastUpdateTime[collectionAddress] = startTime;
-
-    // Create a new reward window with the specified parameters.
+    // Create and add a new reward window
     GalileoStakingStorage.RewardWindow memory newRewardWindow = GalileoStakingStorage.RewardWindow({
       rewardRate: rewardRate,
       startTime: startTime,
       endTime: endTime
     });
-
-    // Add the new reward window to the pool's reward window array.
     pool.rewardWindows.push(newRewardWindow);
 
-    // Update the reward count in the pool to reflect the addition of the new reward window.
-    pool.rewardCount = updateIndex + 1;
+    // Update reward window count
+    pool.rewardCount = pool.rewardWindows.length;
 
     // Emit an event indicating that emission rate is updated.
     emit UpdateEmissionRate(collectionAddress, rewardRate, startTime);
@@ -1054,6 +1046,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
       // Ensure the pool is not already initialized
       if (state.pools[collectionAddress].rewardCount > 0) revert GalileoStakingErrors.PoolAlreadyInitialized();
+
+      // Ensure that only one reward window is provided in the configuration
+      if (poolConfigurationsInput[i].rewardWindows.length != 1) revert GalileoStakingErrors.MultipleRewardWindowsNotAllowed();
 
       // Set the tax for the pool
       if (poolConfigurationsInput[i].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
