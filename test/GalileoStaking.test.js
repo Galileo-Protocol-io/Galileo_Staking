@@ -603,14 +603,17 @@ describe('GalileoStaking', async function () {
       );
     });
 
-    it('Should revert if collection is not configured', async function () {
+    it('Should revert if start time is less then the start time of previous reward window', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
       let currentTime = Math.floor(Date.now() / 1000) + 1000000000;
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
 
-      await (await galileoStaking.connect(admin).configurePool(poolInfo)).wait();
+      await (await GalileoStakings.connect(admin).configurePool(poolInfo)).wait();
 
-      await expect(galileoStaking.updateEmissionRate(nebulaAddress, parseEther('10'), 0)).to.be.revertedWithCustomError(
-        galileoStaking,
+      await expect(GalileoStakings.updateEmissionRate(nebulaAddress, parseEther('10'), 0)).to.be.revertedWithCustomError(
+        GalileoStakings,
         'InvalidTime'
       );
     });
@@ -971,22 +974,31 @@ describe('GalileoStaking', async function () {
 
   describe('Configure Pool', async function () {
     it('Should configure pool by authorize address', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
 
-      await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.not.reverted;
+      await GalileoStakings.connect(admin).configurePool(poolInfo);
     });
 
-    it('Should update configures of pool if pool configurations are already exists', async function () {
+    it('Should revert configures of pool if pool configurations are already exists', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
 
-      await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.not.reverted;
+      await GalileoStakings.connect(admin).configurePool(poolInfo);
 
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.not.reverted;
+      await expect(GalileoStakings.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'PoolAlreadyInitialized'
+      );
     });
 
     it('Should revert is collection address is invalid address', async function () {
@@ -1016,10 +1028,68 @@ describe('GalileoStaking', async function () {
     });
 
     it('Should revert if tax is greater then 10', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('11'), [[rewardRate, currentTime, 0]]]];
 
-      await expect(galileoStaking.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(galileoStaking, 'InvalidTaxRate');
+      await expect(GalileoStakings.connect(admin).configurePool(poolInfo)).to.be.revertedWithCustomError(galileoStaking, 'InvalidTaxRate');
+    });
+  });
+
+  describe('Update Tax Percentage', async function () {
+    it('Should update the tax of already configured collection', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+
+      await galileoStaking.connect(admin).updateTax(nebulaAddress, parseEther('4'));
+
+      const getPoolConfiguration = await galileoStaking.getPoolConfiguration(nebulaAddress)
+      console.log("🚀 ~ getPoolConfiguration:", getPoolConfiguration)
+    });
+
+    it('Should revert if input address is zero address', async function () {
+      await expect(galileoStaking.connect(admin).updateTax(ethers.ZeroAddress, parseEther('2'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAddress'
+      );
+    });
+
+    it('Should revert if input tax percentage is zero', async function () {
+      await expect(galileoStaking.connect(admin).updateTax(nebulaAddress, parseEther('0'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAmount'
+      );
+    });
+
+    it('Should revert if tax percentage is greater then 10%', async function () {
+      await expect(galileoStaking.connect(admin).updateTax(nebulaAddress, parseEther('11'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidTaxRate'
+      );
+    });
+
+    it('Should revert if collection address is not initialized in the pool', async function () {
+      await expect(galileoStaking.connect(admin).updateTax(leoxAddress, parseEther('1'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'PoolUninitialized'
+      );
+    });
+
+    it('Should revert if non ADMIN_ROLE tries to update tax percentage', async function () {
+      await expect(galileoStaking.connect(staker1).updateTax(nebulaAddress, parseEther('11'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'AccessControlUnauthorizedAccount'
+      );
+    });
+
+    it('Should revert if contract is paused', async function () {
+      await galileoStaking.connect(admin).pause();
+      await expect(galileoStaking.connect(staker1).updateTax(nebulaAddress, parseEther('11'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'EnforcedPause'
+      );
     });
   });
 

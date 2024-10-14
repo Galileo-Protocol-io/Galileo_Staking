@@ -106,6 +106,14 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   event StakeLeoxTokens(address indexed collectionAddress, uint256 indexed tokenId, uint256 citizen, uint256 newPoints, uint256 totalLeox);
 
   /**
+   * @dev Emitted when tax percent is updated of a collection.
+   *
+   * @param collectionAddress The address of the collection contract from which tax is withdrawn.
+   * @param newTaxPercent The new percentage of tax against the collection.
+   */
+  event UpdateTax(address indexed collectionAddress, uint256 indexed newTaxPercent);
+
+  /**
    * @dev  Event emitted when multipliers are set for a collection.
    *
    * @param collectionAddress The address of the collection contract.
@@ -919,7 +927,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     uint256 index = state.stakedNFTIndex[recipient][collectionAddress][tokenId];
     uint256 lastIndex = state.stakedNFTs[recipient][collectionAddress].length - 1;
 
-     // Set reward to zero
+    // Set reward to zero
     state.rewards[recipient][collectionAddress][tokenId] = 0;
 
     if (index != lastIndex) {
@@ -1026,8 +1034,8 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       // Ensure the collection address is valid
       if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
-      // Clear the existing reward windows if the pool is already initialized
-      if (state.pools[collectionAddress].rewardCount > 0) delete state.pools[collectionAddress];
+      // Ensure the pool is not already initialized
+      if (state.pools[collectionAddress].rewardCount > 0) revert GalileoStakingErrors.PoolAlreadyInitialized();
 
       // Set the tax for the pool
       if (poolConfigurationsInput[i].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
@@ -1058,6 +1066,35 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
         i++;
       }
     }
+  }
+
+  /**
+   * @dev Updates the tax percentage for the specified NFT collection.
+   *
+   * @param collectionAddress The address of the NFT collection for which the tax is being updated.
+   * @param newTaxPercent The new tax percentage to be applied (must be non-zero and within the max limit).
+   */
+  function updateTax(address collectionAddress, uint256 newTaxPercent) external whenNotPaused onlyRole(ADMIN_ROLE) {
+    // Check if the collection address is valid
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Ensure the new tax percentage is non-zero
+    if (newTaxPercent == 0) revert GalileoStakingErrors.InvalidAmount(newTaxPercent);
+
+    // Ensure the new tax percentage does not exceed the maximum allowed tax limit
+    if (newTaxPercent > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
+
+    // Retrieve the pool data for the specified collection.
+    GalileoStakingStorage.PoolData storage pool = state.pools[collectionAddress];
+
+    // Ensure the pool is already configured against collection address
+    if (pool.rewardCount == 0) revert GalileoStakingErrors.PoolUninitialized(collectionAddress);
+
+    // Update the tax percentage for the specified collection
+    pool.tax = newTaxPercent;
+
+    // Emit an event to signal that the tax has been updated
+    emit UpdateTax(collectionAddress, newTaxPercent);
   }
 
   /**

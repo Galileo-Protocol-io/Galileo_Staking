@@ -16,6 +16,9 @@ library GalileoStakingErrors {
   // Error indicating that a pool associated with a collection has not been initialized
   error PoolUninitialized(address collectionAddress);
 
+  // Error indicating that a pool associated with a collection has been already initialized
+  error PoolAlreadyInitialized();
+
   // Error indicating an invalid count of tokens
   error InvalidTokensCount(uint256 maxLeox);
 
