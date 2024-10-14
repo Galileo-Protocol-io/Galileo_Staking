@@ -783,7 +783,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     uint256 totalRewardTokens = rewardAmount - taxAmount;
 
     // Update the state with the calculated tax amount for the given collection address.
-    state.tax[collectionAddress] = taxAmount;
+    state.tax[collectionAddress] += taxAmount;
 
     // Return the total reward tokens after deducting the tax.
     return totalRewardTokens;
