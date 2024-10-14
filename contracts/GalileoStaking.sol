@@ -14,7 +14,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
-import "hardhat/console.sol";
 
 contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IERC721Receiver {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -919,6 +918,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Retrieve the index of the token in the staked NFTs array
     uint256 index = state.stakedNFTIndex[recipient][collectionAddress][tokenId];
     uint256 lastIndex = state.stakedNFTs[recipient][collectionAddress].length - 1;
+
+     // Set reward to zero
+    state.rewards[recipient][collectionAddress][tokenId] = 0;
 
     if (index != lastIndex) {
       // Swap the token to be removed with the last element in the array
