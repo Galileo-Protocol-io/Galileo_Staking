@@ -87,6 +87,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    */
   event StakeTokens(
     address indexed collectionAddress,
+    address indexed recipient,
     uint256 indexed tokenId,
     uint256 citizen,
     uint256 timelockEndTime,
@@ -103,7 +104,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param newPoints The updated points after adding more tokens.
    * @param totalLeox The total amount of LEOX tokens staked after adding more tokens.
    */
-  event StakeLeoxTokens(address indexed collectionAddress, uint256 indexed tokenId, uint256 citizen, uint256 newPoints, uint256 totalLeox);
+  event StakeLeoxTokens(address indexed collectionAddress, address indexed recipient, uint256 indexed tokenId, uint256 citizen, uint256 newPoints, uint256 totalLeox);
 
   /**
    * @dev Emitted when tax percent is updated of a collection.
@@ -198,7 +199,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param recipient The address of the recipient who receives the withdrawn tax amount.
    * @param taxAmount The total amount of tax withdrawn from the collection.
    */
-  event WithdrawTax(address indexed collectionAddress, address indexed recipient, uint256 indexed taxAmount);
+  event WithdrawTax(address indexed collectionAddress, address indexed recipient, uint256 taxAmount);
 
   /**
    * @dev Emitted when rewards are deposited into the reward pool for a specific NFT collection.
@@ -206,7 +207,8 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param collectionAddress The address of the NFT collection for which rewards are being deposited.
    * @param leoxAmount The amount of LEOX tokens deposited as rewards.
    */
-  event DepositRewards(address indexed collectionAddress, uint256 indexed leoxAmount);
+  event DepositRewards(address indexed collectionAddress, uint256 leoxAmount);
+  
   /**
    * @dev Emitted when a pool is configured or updated.
    *
@@ -352,7 +354,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     _issueSoulBoundToken(collectionAddress, recipient);
 
     // Emit an event to signify the staking of tokens
-    emit StakeTokens(collectionAddress, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
+    emit StakeTokens(collectionAddress, recipient, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
   }
 
   /**
@@ -472,7 +474,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     IERC20(LEOX).safeTransferFrom(recipient, address(this), stakeMoreLeox);
 
     // Emit an event indicating that more LEOX tokens were added to the stake.
-    emit StakeLeoxTokens(collectionAddress, tokenId, stakePerCitizen.citizen, newPoints, totalLeox);
+    emit StakeLeoxTokens(collectionAddress, recipient, tokenId, stakePerCitizen.citizen, newPoints, totalLeox);
   }
 
   /**

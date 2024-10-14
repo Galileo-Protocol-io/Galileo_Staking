@@ -1044,9 +1044,6 @@ describe('GalileoStaking', async function () {
       GalileoStakings = await GalileoStakings.deploy(leoxAddress);
 
       await galileoStaking.connect(admin).updateTax(nebulaAddress, parseEther('4'));
-
-      const getPoolConfiguration = await galileoStaking.getPoolConfiguration(nebulaAddress)
-      console.log("🚀 ~ getPoolConfiguration:", getPoolConfiguration)
     });
 
     it('Should revert if input address is zero address', async function () {
