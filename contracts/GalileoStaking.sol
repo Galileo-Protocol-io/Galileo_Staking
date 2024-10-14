@@ -104,7 +104,14 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param newPoints The updated points after adding more tokens.
    * @param totalLeox The total amount of LEOX tokens staked after adding more tokens.
    */
-  event StakeLeoxTokens(address indexed collectionAddress, address indexed recipient, uint256 indexed tokenId, uint256 citizen, uint256 newPoints, uint256 totalLeox);
+  event StakeLeoxTokens(
+    address indexed collectionAddress,
+    address indexed recipient,
+    uint256 indexed tokenId,
+    uint256 citizen,
+    uint256 newPoints,
+    uint256 totalLeox
+  );
 
   /**
    * @dev Emitted when tax percent is updated of a collection.
@@ -208,7 +215,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param leoxAmount The amount of LEOX tokens deposited as rewards.
    */
   event DepositRewards(address indexed collectionAddress, uint256 leoxAmount);
-  
+
   /**
    * @dev Emitted when a pool is configured or updated.
    *
@@ -659,13 +666,13 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     uint256 poolRewardTokenAmount = state.rewardPool[collectionAddress];
 
     // Revert the transaction if the reward token amount in the pool is less than reward value.
-    if (poolRewardTokenAmount <= rewardsAfterTax) revert GalileoStakingErrors.InvalidAmountRewardPoolBalance();
+    if (poolRewardTokenAmount <= rewardAmount) revert GalileoStakingErrors.InvalidAmountRewardPoolBalance();
 
     // Reset the reward balance for this token and collection to zero after withdrawal.
     state.rewards[recipient][collectionAddress][tokenId] = 0;
 
     // Deduct the reward amount after tax from the pool
-    poolRewardTokenAmount -= rewardsAfterTax;
+    state.rewardPool[collectionAddress] -= rewardAmount;
 
     // Transfer the net reward amount (after tax) to the recipient.
     IERC20(LEOX).safeTransfer(recipient, rewardsAfterTax);
@@ -743,6 +750,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Calculate the rewards after applying any applicable tax from the pool's tax rate.
     uint256 rewardsAfterTax = _calculateTax(collectionAddress, totalRewardAmount, pool.tax);
+
+    // Get available rewards for the collection
+    uint256 poolRewardTokenAmount = state.rewardPool[collectionAddress];
+
+    // Revert if reward pool has insufficient balance
+    if (poolRewardTokenAmount < totalRewardAmount) revert GalileoStakingErrors.InvalidAmountRewardPoolBalance();
+
+    // Deduct the full reward amount from the reward pool
+    state.rewardPool[collectionAddress] -= totalRewardAmount;
 
     // If the reward after tax is greater than zero, transfer the reward tokens to the user.
     IERC20(LEOX).safeTransfer(recipient, rewardsAfterTax);

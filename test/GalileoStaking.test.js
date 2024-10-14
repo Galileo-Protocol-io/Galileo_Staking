@@ -1202,6 +1202,8 @@ describe('GalileoStaking', async function () {
 
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
       await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
+      const remaingRewardTokensPoolBefore = await galileoStaking.getRewardPoolBalance(nebulaAddress);
+
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1222,8 +1224,6 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [timeStake]);
       await ethers.provider.send('evm_mine');
 
-      // Mock reward setup and accumulation
-      // await galileoStaking.updateEmissionRate(nebulaAddress, parseEther('10'), 0);
       const rewards = await galileoStaking.calculateRewards(staker1.address, nebulaAddress, 1);
       let withdrawRewards = await (await galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).wait();
 
@@ -1233,7 +1233,47 @@ describe('GalileoStaking', async function () {
 
       const adjustedRewards = rewardsInEther - rewardsInEther * 0.03;
 
+      const remaingRewardTokensPoolAfter = await galileoStaking.getRewardPoolBalance(nebulaAddress);
+
+      let totalPoolRewardTokens = Number(formatEther(remaingRewardTokensPoolBefore)) - (Number(withdrawRewards) + adjustedRewards * 0.03);
+
+      expect(Number(formatEther(remaingRewardTokensPoolAfter)).toFixed(0)).to.be.equal(Number(totalPoolRewardTokens).toFixed(0));
       expect(adjustedRewards).to.be.equal(Number(withdrawRewards));
+    });
+
+    it('Should allow user to withdraw rewards', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 1;
+      const citizen = 1;
+
+      const timeStake = 60;
+
+      await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
+      const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: timeStake,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await galileoStaking.connect(staker1).stake(voucher);
+
+      await ethers.provider.send('evm_increaseTime', [timeStake]);
+      await ethers.provider.send('evm_mine');
+
+      await expect(galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAmountRewardPoolBalance'
+      );
     });
 
     it('Should revert if collection address is invalid', async function () {
@@ -1316,7 +1356,6 @@ describe('GalileoStaking', async function () {
       const citizen = 1;
 
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
-      await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       // Approve tokens for transfer
       await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
@@ -1339,22 +1378,9 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_mine');
 
       // Mock reward setup and accumulation
-      // await galileoStaking.updateEmissionRate(nebulaAddress, parseEther('10'), 0);
-      const rewards = await galileoStaking.calculateRewards(staker1.address, nebulaAddress, 1);
-      let withdrawRewards = await (await galileoStaking.connect(staker1).withdrawAllRewards(nebulaAddress)).wait();
+      await galileoStaking.calculateRewards(staker1.address, nebulaAddress, 1);
 
-      withdrawRewards = Number(formatEther(withdrawRewards.logs[1].args[2])).toFixed(2);
-
-      const rewardsInEther = parseFloat(formatEther(rewards)) + 1; // Convert to number
-
-      const adjustedRewards = rewardsInEther - rewardsInEther * 0.03;
-
-      let taxAmount = rewardsInEther - adjustedRewards;
-      taxAmount = Number(taxAmount.toFixed(2));
-
-      let withdrawTax = await (await galileoStaking.connect(admin).withdrawTax(nebulaAddress)).wait();
-      withdrawTax = parseFloat(formatEther(withdrawTax.logs[1].args[2]));
-      expect(withdrawTax).to.be.equal(taxAmount);
+      await expect(galileoStaking.connect(admin).withdrawTax(nebulaAddress)).to.be.revertedWithCustomError(galileoStaking, 'InvalidAmount');
     });
 
     it('Should revert if collection address is invalid', async function () {
