@@ -57,7 +57,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   address public immutable LEOX;
 
   // Constant for INCREMENT value
-  uint256 private constant INCREMENT = 400 ether; // 400 LEOX indicates one point
+  uint256 private immutable INCREMENT; // INCREMENT indicates one point
 
   /// A constant multiplier to reduce overflow in staking calculations.
   uint256 private constant PRECISION = 1 ether;
@@ -230,11 +230,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   /**
    * @dev Constructor to initialize the contract.
    *
-   * @param _leox The address of the LEOX token contract.
+   * @param leox The address of the LEOX token contract.
+   * @param increment INCREMENT value that indicates one point
    */
-  constructor(address _leox) EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
+  constructor(address leox, uint256 increment) EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
     // Ensure that the LEOX token address is not zero
-    if (_leox == address(0)) revert GalileoStakingErrors.InvalidAddress();
+    if (leox == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Ensure that the INCREMENT is not zero
+    if (increment == 0) revert GalileoStakingErrors.InvalidIncrement();
 
     // Grant the default admin role to the deploying address
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -243,7 +247,10 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     _grantRole(ADMIN_ROLE, _msgSender());
 
     // Set the LEOX token address
-    LEOX = _leox;
+    LEOX = leox;
+
+    // Set the INCREMENT value that indicates one point
+    INCREMENT = increment;
   }
 
   // ═══════════════════════ FUNCTIONS ════════════════════════
@@ -529,7 +536,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakedTokens The number of staked LEOX tokens.
    * @return The calculated points for the staked tokens.
    */
-  function _calculateStakeLeoxPoints(uint256 stakedTokens) internal pure returns (uint256) {
+  function _calculateStakeLeoxPoints(uint256 stakedTokens) internal view returns (uint256) {
     // Calculate the base points by dividing the staked tokens by the INCREMENT
     uint256 points = ((stakedTokens * PRECISION) / INCREMENT) * PRECISION;
 

@@ -12,6 +12,8 @@ let totalNebulaSupply = 3333;
 let yieldTraitPointC1 = 5;
 let yieldTraitPointC2 = 4;
 
+let INCREMENT = parseEther('400');
+
 const ADMIN_ROLE = ethers.id('ADMIN_ROLE');
 const VALIDATOR_ROLE = ethers.id('VALIDATOR_ROLE');
 
@@ -39,7 +41,7 @@ describe('GalileoStaking', async function () {
 
     // Deploy GalileoStaking contract
     GalileoStaking = await ethers.getContractFactory('GalileoStaking');
-    galileoStaking = await GalileoStaking.deploy(leoxAddress);
+    galileoStaking = await GalileoStaking.deploy(leoxAddress, INCREMENT);
     galileoStakingAddress = await galileoStaking.getAddress();
 
     // Deploy soul bound token contract
@@ -75,7 +77,12 @@ describe('GalileoStaking', async function () {
 
     it('Should revert if LEOX address is zero address', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      await expect(GalileoStakings.deploy(ethers.ZeroAddress)).to.be.revertedWithCustomError(GalileoStakings, 'InvalidAddress');
+      await expect(GalileoStakings.deploy(ethers.ZeroAddress, INCREMENT)).to.be.revertedWithCustomError(GalileoStakings, 'InvalidAddress');
+    });
+
+    it('Should revert if the INCREMENT is zero', async function () {
+      let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
+      await expect(GalileoStakings.deploy(leoxAddress, 0)).to.be.revertedWithCustomError(GalileoStakings, 'InvalidIncrement');
     });
 
     it('Should assign admin role to deployer', async function () {
@@ -194,7 +201,7 @@ describe('GalileoStaking', async function () {
 
     it('Should return 0 if no token is staked', async function () {
       const GalileoStaking1 = await ethers.getContractFactory('GalileoStaking');
-      const galileoStaking1 = await GalileoStaking1.deploy(leoxAddress);
+      const galileoStaking1 = await GalileoStaking1.deploy(leoxAddress, INCREMENT);
       let stakedPercentage = await galileoStaking1.getStakedPercentage(nebulaAddress);
 
       expect(stakedPercentage).to.equal(0);
@@ -273,7 +280,7 @@ describe('GalileoStaking', async function () {
 
     it('Should not allow staking with uninitialized pool', async function () {
       const GalileoStaking1 = await ethers.getContractFactory('GalileoStaking');
-      const galileoStaking1 = await GalileoStaking1.deploy(leoxAddress);
+      const galileoStaking1 = await GalileoStaking1.deploy(leoxAddress, INCREMENT);
       const galileoStakingAddress1 = await galileoStaking1.getAddress();
 
       const stakeInfo = [
@@ -960,7 +967,7 @@ describe('GalileoStaking', async function () {
   describe('Configure Pool', async function () {
     it('Should configure pool by authorize address', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress, INCREMENT);
 
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
@@ -970,7 +977,7 @@ describe('GalileoStaking', async function () {
 
     it('Should revert configure pool with multiple reward windows', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress, INCREMENT);
 
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [
@@ -992,7 +999,7 @@ describe('GalileoStaking', async function () {
 
     it('Should revert configures of pool if pool configurations are already exists', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress, INCREMENT);
 
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
@@ -1036,7 +1043,7 @@ describe('GalileoStaking', async function () {
 
     it('Should revert if tax is greater then 10', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress, INCREMENT);
 
       let currentTime = Math.floor(Date.now() / 1000);
       const poolInfo = [[nebulaAddress, parseEther('11'), [[rewardRate, currentTime, 0]]]];
@@ -1048,7 +1055,7 @@ describe('GalileoStaking', async function () {
   describe('Update Tax Percentage', async function () {
     it('Should update the tax of already configured collection', async function () {
       let GalileoStakings = await ethers.getContractFactory('GalileoStaking');
-      GalileoStakings = await GalileoStakings.deploy(leoxAddress);
+      GalileoStakings = await GalileoStakings.deploy(leoxAddress, INCREMENT);
 
       await galileoStaking.connect(admin).updateTax(nebulaAddress, parseEther('4'));
     });

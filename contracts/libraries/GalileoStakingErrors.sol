@@ -10,6 +10,9 @@ library GalileoStakingErrors {
   // Error indicating an input is invalid
   error InvalidInput();
 
+  // Error indicating an INCREMENT is invalid
+  error InvalidIncrement();
+
   // Error indicating that a collection has not been initialized
   error CollectionUninitialized();
 
@@ -19,7 +22,7 @@ library GalileoStakingErrors {
   // Error indicating that a pool associated with a collection has been already initialized
   error PoolAlreadyInitialized();
 
-// Error indicating that multiple reward windows detected at pool config input
+  // Error indicating that multiple reward windows detected at pool config input
   error MultipleRewardWindowsNotAllowed();
 
   // Error indicating an invalid count of tokens
