@@ -391,25 +391,26 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Update the stored reward per token for the collection to the current value.
     state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
 
+    // Set start time to current block timestamp
+    uint256 startTime = block.timestamp;
+
+    // Update the last update time for the collection to the current block timestamp.
+    state.lastUpdateTime[collectionAddress] = startTime;
+
     // Access the pool data associated with the collection address.
     GalileoStakingStorage.PoolData storage pool = state.pools[collectionAddress];
 
     // Determine the index for the new reward window.
     uint256 lastIndex = pool.rewardWindows.length - 1;
 
-    // Set start time to current block timestamp
-    uint256 startTime = block.timestamp;
+    // Allow endTime to be 0 (no end time) or greater than startTime
+    if (endTime != 0 && endTime <= startTime) revert GalileoStakingErrors.InvalidEndTime();
 
     // Close the last reward window by setting its end time
     pool.rewardWindows[lastIndex].endTime = startTime;
 
     // Create and add a new reward window
-    GalileoStakingStorage.RewardWindow memory newRewardWindow = GalileoStakingStorage.RewardWindow({
-      rewardRate: rewardRate,
-      startTime: startTime,
-      endTime: endTime
-    });
-    pool.rewardWindows.push(newRewardWindow);
+    pool.rewardWindows.push(GalileoStakingStorage.RewardWindow({ rewardRate: rewardRate, startTime: startTime, endTime: endTime }));
 
     // Update reward window count
     pool.rewardCount = pool.rewardWindows.length;
@@ -561,33 +562,20 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Start with the last stored reward per token.
     uint256 rewardPerTokenAcc = state.rewardPerTokenStored[collectionAddress];
 
-    // Get the last reward window for the pool (although this line seems unnecessary here).
-    pool.rewardWindows[pool.rewardWindows.length - 1];
-
-    // Set the starting point for reward calculations from the last update time.
-    uint256 periodStart = state.lastUpdateTime[collectionAddress];
-
     // Loop through the reward windows in reverse order, starting with the most recent.
-    for (uint256 i = pool.rewardCount; i > 0; i--) {
-      GalileoStakingStorage.RewardWindow memory rewardWindow = pool.rewardWindows[i - 1];
+    GalileoStakingStorage.RewardWindow memory rewardWindow = pool.rewardWindows[pool.rewardWindows.length - 1];
+    // Only consider reward windows that have already started.
+    if (block.timestamp > rewardWindow.startTime) {
+      // Use the lesser of `block.timestamp` or `endTime` to calculate the reward period
+      uint256 effectiveEndTime = (rewardWindow.endTime > 0 && block.timestamp > rewardWindow.endTime)
+        ? rewardWindow.endTime
+        : block.timestamp;
 
-      // Only consider reward windows that have already started.
-      if (block.timestamp > rewardWindow.startTime) {
-        // Use the lesser of `block.timestamp` or `endTime` to calculate the reward period
-        uint256 effectiveEndTime = rewardWindow.endTime > 0 && block.timestamp > rewardWindow.endTime
-          ? rewardWindow.endTime
-          : block.timestamp;
+      // Calculate the time period for which rewards are being distributed
+      uint256 timePeriod = effectiveEndTime - state.lastUpdateTime[collectionAddress];
 
-        // Calculate the time period for which rewards are being distributed
-        uint256 timePeriod = effectiveEndTime - periodStart;
-
-        // Calculate and accumulate the reward per token based on the time period
-        rewardPerTokenAcc += (rewardWindow.rewardRate * timePeriod * 1e18) / pool.totalPoints;
-
-        // Update the period start to the start time of the current reward window
-        periodStart = rewardWindow.startTime;
-        break;
-      }
+      // Calculate and accumulate the reward per token based on the time period
+      rewardPerTokenAcc += (rewardWindow.rewardRate * timePeriod * 1e18) / pool.totalPoints;
     }
 
     // Return the accumulated reward per token.
@@ -1057,26 +1045,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       // Ensure that only one reward window is provided in the configuration
       if (poolConfigurationsInput[i].rewardWindows.length != 1) revert GalileoStakingErrors.MultipleRewardWindowsNotAllowed();
 
-      // Set the tax for the pool
+      // Validate and set the tax rate for the pool
       if (poolConfigurationsInput[i].tax > MAX_TAX_LIMIT) revert GalileoStakingErrors.InvalidTaxRate();
       state.pools[collectionAddress].tax = poolConfigurationsInput[i].tax;
 
-      // Get the number of reward windows for the current input
-      uint256 poolRewardWindowCount = poolConfigurationsInput[i].rewardWindows.length;
+      // Initialize reward count to 1
+      state.pools[collectionAddress].rewardCount = 1;
 
-      // Set the reward count for the pool
-      state.pools[collectionAddress].rewardCount = poolRewardWindowCount;
-
-      // Iterate through each reward window for the current input
-      for (uint256 j; j < poolRewardWindowCount; ) {
-        // Add the reward window to the pool's reward windows
-        state.pools[collectionAddress].rewardWindows.push(poolConfigurationsInput[i].rewardWindows[j]);
-
-        // Increment the index for the next reward window
-        unchecked {
-          j++;
-        }
-      }
+      // Add the first reward window to the pool
+      state.pools[collectionAddress].rewardWindows.push(poolConfigurationsInput[i].rewardWindows[0]);
 
       // Emit an event to log the pool configuration
       emit ConfigurePool(collectionAddress, poolConfigurationsInput[i].tax, poolConfigurationsInput[i].rewardWindows);

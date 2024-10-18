@@ -31,6 +31,9 @@ library GalileoStakingErrors {
   // Error indicating an invalid time
   error InvalidTime();
 
+  // Error indicating that endtime of reward window is invalid
+  error InvalidEndTime();
+
   // Error indicating that stake time is not completed yet
   error UnstakeBeforeLockPeriod(uint256 lockPeriodEnd);
 

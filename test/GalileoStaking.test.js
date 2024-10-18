@@ -596,6 +596,13 @@ describe('GalileoStaking', async function () {
       expect(updateEmissionRate.logs[0].args[1]).to.equal(parseEther('10'));
     });
 
+    it('Should revert if end time is not zero but less then current time', async function () {
+      await expect(galileoStaking.updateEmissionRate(nebulaAddress, parseEther('10'), 100)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidEndTime'
+      );
+    });
+
     it('Should revert if collection is not configured', async function () {
       await expect(galileoStaking.updateEmissionRate(leoxAddress, parseEther('10'), 0)).to.be.revertedWithCustomError(
         galileoStaking,
