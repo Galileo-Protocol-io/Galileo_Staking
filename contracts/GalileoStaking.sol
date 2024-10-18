@@ -355,7 +355,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Store the index of the newly added stake within the stakedNFTs list
     state.stakedNFTIndex[recipient][collectionAddress][tokenId] = state.stakedNFTs[recipient][collectionAddress].length - 1;
 
-    // Increment the total staked amount for the collection (likely ERC721 tokens)
+    // Increment the total staked amount for the collection
     state.erc721Staked[collectionAddress] += PRECISION;
 
     // Transfer the token to this contract
@@ -842,6 +842,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Update the pool's total points by subtracting the points of the unstaked token
     state.pools[collectionAddress].totalPoints -= points;
 
+    // Decrement the total staked amount for the collection
+    state.erc721Staked[collectionAddress] -= PRECISION;
+
     // Remove the staker's position record for the token
     delete state.stakersPosition[recipient][collectionAddress][tokenId];
     delete state.lastRewardTime[recipient][collectionAddress][tokenId];
@@ -926,6 +929,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Update the pool's total points by subtracting the points of the unstaked token
     state.pools[collectionAddress].totalPoints -= points;
+
+    // Decrement the total staked amount for the collection
+    state.erc721Staked[collectionAddress] -= PRECISION;
 
     // Remove the staker's position record for the token
     delete state.stakersPosition[recipient][collectionAddress][tokenId];
