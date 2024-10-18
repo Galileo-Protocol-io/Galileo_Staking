@@ -571,11 +571,14 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
         ? rewardWindow.endTime
         : block.timestamp;
 
-      // Calculate the time period for which rewards are being distributed
-      uint256 timePeriod = effectiveEndTime - state.lastUpdateTime[collectionAddress];
+      // Prevent underflow by ensuring effectiveEndTime > lastUpdateTime
+      if (effectiveEndTime > state.lastUpdateTime[collectionAddress]) {
+        // Calculate the time period for which rewards are being distributed
+        uint256 timePeriod = effectiveEndTime - state.lastUpdateTime[collectionAddress];
 
-      // Calculate and accumulate the reward per token based on the time period
-      rewardPerTokenAcc += (rewardWindow.rewardRate * timePeriod * 1e18) / pool.totalPoints;
+        // Calculate and accumulate the reward per token based on the time period
+        rewardPerTokenAcc += (rewardWindow.rewardRate * timePeriod * 1e18) / pool.totalPoints;
+      }
     }
 
     // Return the accumulated reward per token.
