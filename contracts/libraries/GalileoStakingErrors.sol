@@ -77,4 +77,10 @@ library GalileoStakingErrors {
 
   // Error indicating that Yield Trait Points hierarchy is invalid in configure collection
   error InvalidTraitPointsHierarchy();
+
+  // Error indicating that an emergency is not declared
+  error EmergencyNotDeclared();
+
+  // Error indicating that the emergency state is the same as the current state
+  error StateAlreadyDeclared();
 }

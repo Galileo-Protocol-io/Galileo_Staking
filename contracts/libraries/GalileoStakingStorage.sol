@@ -129,5 +129,7 @@ library GalileoStakingStorage {
     mapping(address => mapping(address => mapping(uint256 => uint256))) lastRewardTime;
     // Tracks total rewards per collection
     mapping(address => uint256) rewardPool;
+    // Mapping to store emergency status against collection
+    mapping(address => bool) isEmergencyDeclared;
   }
 }

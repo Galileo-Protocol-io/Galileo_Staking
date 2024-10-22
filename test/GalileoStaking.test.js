@@ -24,8 +24,6 @@ describe('GalileoStaking', async function () {
   let SoulBounToken, soulBounToken;
   let leoxAddress, nebulaAddress, galileoStakingAddress, sbtAddress;
 
-  let tokenArray1, tokenArray2;
-
   beforeEach(async function () {
     [admin, staker1, staker2, staker3] = await ethers.getSigners();
 
@@ -1623,11 +1621,12 @@ describe('GalileoStaking', async function () {
   });
 
   describe('Emergency Unstake Tokens and does not get rewards', function () {
-    it('Should allow user to emergency unstake tokens without get rewards', async function () {
+    it('Should allow user to emergency unstake tokens without get rewards when emerygency is declared if staker has 2 Nebulas', async function () {
       const stakeLeoxAmount = parseEther('100');
       let tokenId = 1;
       let citizen = 1;
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
@@ -1691,6 +1690,7 @@ describe('GalileoStaking', async function () {
       let tokenId = 1;
       let citizen = 1;
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
@@ -1727,7 +1727,15 @@ describe('GalileoStaking', async function () {
       expect(stakerLeoxBalanceAfter).to.be.equal(stakerLeoxBalanceBefore);
     });
 
+    it('Should revert if emergency is not declared', async function () {
+      await expect(galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'EmergencyNotDeclared'
+      );
+    });
+
     it('Should revert if collection address is invalid', async function () {
+      await (await galileoStaking.connect(admin).declareEmergency(nebulaAddress)).wait();
       await expect(galileoStaking.connect(staker1).emergencyUnstake(ethers.ZeroAddress, 1)).to.be.revertedWithCustomError(
         galileoStaking,
         'InvalidAddress'
@@ -1735,6 +1743,7 @@ describe('GalileoStaking', async function () {
     });
 
     it('Should revert if token id is invalid', async function () {
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await expect(galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 0)).to.be.revertedWithCustomError(
         galileoStaking,
         'InvalidTokenId'
@@ -1742,6 +1751,7 @@ describe('GalileoStaking', async function () {
     });
 
     it('Should revert if token id is not staked', async function () {
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await expect(galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 5)).to.be.revertedWithCustomError(
         galileoStaking,
         'TokenNotStaked'
@@ -1749,9 +1759,100 @@ describe('GalileoStaking', async function () {
     });
   });
 
+  describe('Declare Emergency', function () {
+    it('Should declare emergency and update the emission rate to zero by Admin', async function () {
+      await (await galileoStaking.connect(admin).declareEmergency(nebulaAddress)).wait();
+
+      // Fetch logs for UpdateEmissionRate event
+      const updateEmissionRateLogs = await galileoStaking.queryFilter(galileoStaking.filters.UpdateEmissionRate(), 0, 'latest');
+      const updateEmissionRateEvents = updateEmissionRateLogs.map((log) => ({
+        collectionAddress: log.args[0], // Address of the user
+        rewardRate: log.args[1].toString(), // New emission rate
+        endTimePreviousRewardWindow: log.args[2].toString(), // Timestamp
+      }));
+      // Fetch logs for DeclareEmergency event
+      const declareEmergencyLogs = await galileoStaking.queryFilter(galileoStaking.filters.DeclareEmergency(), 0, 'latest');
+      const declareEmergencyEvents = declareEmergencyLogs.map((log) => ({
+        status: log.args[1], // Emergency status
+      }));
+      expect(declareEmergencyEvents[0].status).to.be.true;
+      expect(updateEmissionRateEvents[0].rewardRate).to.equal('0');
+      expect(updateEmissionRateEvents[0].collectionAddress).to.equal(nebulaAddress);
+    });
+
+    it('Should revert if dublicate emergency status is entered', async function () {
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
+      await expect(galileoStaking.connect(admin).declareEmergency(nebulaAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'StateAlreadyDeclared'
+      );
+    });
+
+    it('Should revert if collection address is zero address', async function () {
+      await expect(galileoStaking.connect(admin).declareEmergency(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAddress'
+      );
+    });
+
+    it('Should revert if collection address is not configured yet', async function () {
+      await expect(galileoStaking.connect(admin).declareEmergency(leoxAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'CollectionUninitialized'
+      );
+    });
+
+    it('Should revert if non-admin tries to invoke the function', async function () {
+      await expect(galileoStaking.connect(staker1).declareEmergency(nebulaAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'AccessControlUnauthorizedAccount'
+      );
+    });
+  });
+
+  describe('Lift Emergency', function () {
+    it('Should lift emergency and update the emission rate to zero by Admin', async function () {
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
+
+      const rewardRate = parseEther('1');
+      await (await galileoStaking.connect(admin).liftEmergency(nebulaAddress, rewardRate)).wait();
+
+      // Fetch logs for UpdateEmissionRate event
+      const updateEmissionRateLogs = await galileoStaking.queryFilter(galileoStaking.filters.UpdateEmissionRate(), 0, 'latest');
+      const updateEmissionRateEvents = updateEmissionRateLogs.map((log) => ({
+        collectionAddress: log.args[0], // Address of the user
+        rewardRate: log.args[1].toString(), // New emission rate
+        endTimePreviousRewardWindow: log.args[2].toString(), // Timestamp
+      }));
+
+      // Fetch logs for DeclareEmergency event
+      const declareEmergencyLogs = await galileoStaking.queryFilter(galileoStaking.filters.DeclareEmergency(), 0, 'latest');
+      const declareEmergencyEvents = declareEmergencyLogs.map((log) => ({
+        status: log.args[1], // Emergency status
+      }));
+      expect(declareEmergencyEvents[1].status).to.be.false;
+      expect(updateEmissionRateEvents[1].rewardRate).to.equal(rewardRate);
+      expect(updateEmissionRateEvents[1].collectionAddress).to.equal(nebulaAddress);
+    });
+
+    it('Should revert if reward rate is zero', async function () {
+      const rewardRate = parseEther('0');
+      await expect(galileoStaking.connect(admin).liftEmergency(nebulaAddress, rewardRate)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidRewardRate'
+      );
+    });
+
+    it('Should revert if non-admin tries to invoke the function', async function () {
+      await expect(galileoStaking.connect(staker1).declareEmergency(nebulaAddress)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'AccessControlUnauthorizedAccount'
+      );
+    });
+  });
+
   describe('Get Staked information in pagination', function () {
     it('Should return the expected record in pagination', async function () {
-      let stakeTimeInPool = 10;
       let stakeLeoxAmount = parseEther('100');
       let tokenId = 1;
       let citizen = 1;

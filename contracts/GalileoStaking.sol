@@ -38,12 +38,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   // The version of the signature schema, used in conjunction with the signing domain for EIP-712 signatures.
   string private constant SIGNATURE_VERSION = "1";
 
-  // Constants for function selectors
-  // Selector for transferFrom function
-  bytes4 private constant _TRANSFER_FROM_SELECTOR = 0x23b872dd;
-  // Selector for transfer function
-  bytes4 private constant _TRANSFER_SELECTOR = 0xa9059cbb;
-
   // Importing the GalileoStakingStorage library for the State struct
   using GalileoStakingStorage for GalileoStakingStorage.State;
 
@@ -217,6 +211,14 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   event DepositRewards(address indexed collectionAddress, uint256 leoxAmount);
 
   /**
+   * @dev Emitted whenever the emergency status is changed.
+   *
+   * @param collectionAddress The address of the NFT collection.
+   * @param isEmergencyDeclared A boolean value indicating the current state of emergency
+   */
+  event DeclareEmergency(address collectionAddress, bool isEmergencyDeclared);
+
+  /**
    * @dev Emitted when a pool is configured or updated.
    *
    * @param collectionAddress The address of the collection contract for which the pool is configured.
@@ -372,21 +374,34 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   }
 
   /**
-   * @dev Internal function to update the share per window and set a new emission rate.
+   * @dev External function to update the share per window and set a new emission rate.
    *
    * @param collectionAddress The address of the collection contract.
    * @param rewardRate The new reward rate to be set for the upcoming reward window.
    * @param endTime The end time of the new reward window.
    */
   function updateEmissionRate(address collectionAddress, uint256 rewardRate, uint256 endTime) external whenNotPaused onlyRole(ADMIN_ROLE) {
+    // Revert if the reward rate is 0 (invalid for emissions).
+    if (rewardRate == 0) revert GalileoStakingErrors.InvalidRewardRate();
+
+    // Update the emission rate for the collection with the provided reward rate and end time.
+    _updateEmissionRate(collectionAddress, rewardRate, endTime);
+  }
+
+  /**
+   * @dev Internal function to update the share per window and set a new emission rate.
+   *
+   * @param collectionAddress The address of the collection contract.
+   * @param rewardRate The new reward rate to be set for the upcoming reward window.
+   * @param endTime The end time of the new reward window.
+   */
+
+  function _updateEmissionRate(address collectionAddress, uint256 rewardRate, uint256 endTime) internal {
     // Retrieve the total number of reward windows for the specified collection.
     uint256 totalRewardWindows = state.pools[collectionAddress].rewardCount;
 
     // Check if there are any reward windows initialized for the collection.
     if (totalRewardWindows == 0) revert GalileoStakingErrors.CollectionUninitialized();
-
-    // Ensure that the reward rate provided is not zero.
-    if (rewardRate == 0) revert GalileoStakingErrors.InvalidRewardRate();
 
     // Update the stored reward per token for the collection to the current value.
     state.rewardPerTokenStored[collectionAddress] = rewardPerToken(collectionAddress);
@@ -909,6 +924,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     // Validate the collection address to ensure it is not a zero address
     if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
 
+    // Validate that the emergency is not declared yet
+    if (!state.isEmergencyDeclared[collectionAddress]) revert GalileoStakingErrors.EmergencyNotDeclared();
+
     // Validate the token ID to ensure it is greater than zero
     if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
 
@@ -1181,6 +1199,57 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
     // Emit an event for the reward deposit
     emit DepositRewards(collectionAddress, leoxAmount);
+  }
+
+  /**
+   * @dev External function to declare an emergency for a given collection.
+   *
+   * @param collectionAddress The address of the NFT collection for which the emergency is being declared.
+   */
+  function declareEmergency(address collectionAddress) external onlyRole(ADMIN_ROLE) {
+    // Call internal function to update emergency status and set reward rate to zero.
+    _emergencyStatus(collectionAddress, true, 0);
+  }
+
+  /**
+   * @dev External function to lift an emergency for a given collection.
+   *
+   * @param collectionAddress The address of the NFT collection for which the emergency is being lifted.
+   * @param rewardRate The new reward rate to be applied after lifting the emergency.
+   */
+  function liftEmergency(address collectionAddress, uint256 rewardRate) external onlyRole(ADMIN_ROLE) {
+    // Revert if the reward rate is 0 (invalid for emissions).
+    if (rewardRate == 0) revert GalileoStakingErrors.InvalidRewardRate();
+
+    // Call internal function to lift the emergency and update the reward rate.
+    _emergencyStatus(collectionAddress, false, rewardRate);
+  }
+
+  /**
+   * @dev Internal function to declare or revoke emergency status for a specific collection.
+   *
+   * @param collectionAddress The address of the NFT collection being updated.
+   * @param emergencyStatus A boolean value indicating the desired emergency status.
+   * @param rewardRate The reward rate associated with the collection. This value is set to zero when emergency status is declared.
+   */
+  function _emergencyStatus(address collectionAddress, bool emergencyStatus, uint256 rewardRate) internal {
+    // Validate the collection address to ensure it is not a zero address
+    if (collectionAddress == address(0)) revert GalileoStakingErrors.InvalidAddress();
+
+    // Ensure the collection is already configured
+    if (state.pools[collectionAddress].rewardCount == 0) revert GalileoStakingErrors.CollectionUninitialized();
+
+    // Check if the current emergency state matches the input value
+    if (state.isEmergencyDeclared[collectionAddress] == emergencyStatus) revert GalileoStakingErrors.StateAlreadyDeclared();
+
+    // Update the emergency state to the new input value.
+    state.isEmergencyDeclared[collectionAddress] = emergencyStatus;
+
+    // Update the emission rate for the collection to zero
+    _updateEmissionRate(collectionAddress, rewardRate, 0);
+
+    // Emit an event to log the emergency status change.
+    emit DeclareEmergency(collectionAddress, emergencyStatus);
   }
 
   /**
