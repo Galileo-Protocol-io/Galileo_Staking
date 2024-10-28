@@ -367,7 +367,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     IERC20(LEOX).safeTransferFrom(recipient, address(this), stakedLeox);
 
     // Issue Sould Bound Token to the staker
-    _issueSoulBoundToken(collectionAddress, recipient);
+    _issueSoulBoundToken(collectionAddress, recipient, tokenId);
 
     // Emit an event to signify the staking of tokens
     emit StakeTokens(collectionAddress, recipient, tokenId, citizen, currentTime + timelockEndTime, points, stakedLeox);
@@ -1464,11 +1464,11 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    *
    * @param stakerAddress The address of the staker's wallet.
    */
-  function _issueSoulBoundToken(address collectionAddress, address stakerAddress) internal {
+  function _issueSoulBoundToken(address collectionAddress, address stakerAddress, uint256 tokenId) internal {
     // Get the address of the SBT contract associated with the collection
     address soulboundToken = state.soulboundTokenToCollection[collectionAddress];
     // Call the Galileo Sould Bound Token contract to issue the token
-    IGALILEOSOULBOUNDTOKEN(soulboundToken).issue(stakerAddress);
+    IGALILEOSOULBOUNDTOKEN(soulboundToken).issue(stakerAddress, tokenId);
   }
 
   /**

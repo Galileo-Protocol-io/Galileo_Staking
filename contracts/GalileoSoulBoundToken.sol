@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable {
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-  uint256 private tokenId;
+  uint256 private tokensCount;
   string private _baseTokenURI;
 
   event SetBaseURI(string indexed baseTokenURI);
@@ -19,8 +19,8 @@ contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable
     _baseTokenURI = baseTokenURI;
   }
 
-  function issue(address to) external onlyRole(ADMIN_ROLE) {
-    tokenId++;
+  function issue(address to, uint256 tokenId) external onlyRole(ADMIN_ROLE) {
+    tokensCount++;
     _safeMint(to, tokenId);
   }
 
@@ -36,7 +36,12 @@ contract GalileoSoulBoundToken is ERC721, ERC721Burnable, AccessControl, Ownable
   }
 
   function burn(uint256 _tokenId) public override onlyRole(ADMIN_ROLE) {
+    tokensCount--;
     super._burn(_tokenId);
+  }
+
+  function totalSupply() public view returns (uint256) {
+    return tokensCount;
   }
 
   // Override the _transfer function to prevent transfers

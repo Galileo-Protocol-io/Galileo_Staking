@@ -8,7 +8,7 @@ interface IGALILEOSOULBOUNDTOKEN {
    *
    * Soulbound tokens are typically non-transferable and tied to the recipient forever.
    */
-  function issue(address to) external;
+  function issue(address to, uint256 tokenId) external;
 
   /**
    * @dev Burns the specified Soulbound token, removing it from existence.
