@@ -361,7 +361,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     state.erc721Staked[collectionAddress] += PRECISION;
 
     // Transfer the token to this contract
-    IERC721(collectionAddress).safeTransferFrom(recipient, address(this), tokenId);
+    IERC721(collectionAddress).transferFrom(recipient, address(this), tokenId);
 
     // Transfer the staked LEOX tokens to this contract
     IERC20(LEOX).safeTransferFrom(recipient, address(this), stakedLeox);
@@ -883,7 +883,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     _burnSoulBoundToken(collectionAddress, tokenId);
 
     // Transfer the unstaked token back to the recipient
-    IERC721(collectionAddress).safeTransferFrom(address(this), recipient, tokenId);
+    IERC721(collectionAddress).transferFrom(address(this), recipient, tokenId);
 
     // Transfer the staked LEOX tokens back to the recipient
     IERC20(LEOX).safeTransfer(recipient, stakeInfo.stakedLEOX);
@@ -977,7 +977,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     _burnSoulBoundToken(collectionAddress, tokenId);
 
     // Transfer the unstaked token back to the recipient
-    IERC721(collectionAddress).safeTransferFrom(address(this), recipient, tokenId);
+    IERC721(collectionAddress).transferFrom(address(this), recipient, tokenId);
 
     // Transfer the staked LEOX tokens back to the recipient
     IERC20(LEOX).safeTransfer(recipient, stakeInfo.stakedLEOX);

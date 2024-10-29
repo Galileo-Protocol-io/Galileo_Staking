@@ -1,12 +1,12 @@
-# Galileo-Staking
+# Galileo-Staking-Platform
 
 ## Overview
 
-The Galileo Staking Platform is a groundbreaking solution offering a dynamic reward system and unparalleled flexibility. It supports multiple ERC721 collections, allowing admin to configure and users to stake a wide variety of NFTs. With its innovative approach, Galileo redefines NFT staking by providing customizable and rewarding experiences for users.
+The Galileo Staking Platform is designed to integrate Nebula Odyssey NFTs and LEOX tokens in a system that rewards users for their participation. The platform offers users the ability to stake Nebula Odyssey NFTs alongside LEOX tokens to earn rewards, loyalty points, and governance rights within the ecosystem.
 
 ## Installation
 
-To get started with the Galileo-Protocol project, follow these installation steps:
+To get started with the Galileo-Staking-Platform project, follow these installation steps:
 
 1. Clone the repository:
 

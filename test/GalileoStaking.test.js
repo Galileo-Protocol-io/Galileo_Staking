@@ -28,13 +28,13 @@ describe('GalileoStaking', async function () {
     [admin, staker1, staker2, staker3] = await ethers.getSigners();
 
     // Deploy mock ERC20 token
-    ERC20Token = await ethers.getContractFactory('MockLeox');
-    erc20Token = await ERC20Token.deploy();
+    ERC20Token = await ethers.getContractFactory('QRC20');
+    erc20Token = await ERC20Token.deploy('Leox', 'LEOX', 18, parseEther('10000000000'), admin.address, admin.address, parseEther('10000000000'), true);
     leoxAddress = await erc20Token.getAddress();
 
     // Deploy mock ERC721 token
-    ERC721Token = await ethers.getContractFactory('MockNebula');
-    erc721Token = await ERC721Token.deploy('https://tokenURIs/');
+    ERC721Token = await ethers.getContractFactory('QRC721');
+    erc721Token = await ERC721Token.deploy('Nebula', 'NBL', 'https://tokenURIs/', admin.address);
     nebulaAddress = await erc721Token.getAddress();
 
     // Deploy GalileoStaking contract
@@ -47,7 +47,7 @@ describe('GalileoStaking', async function () {
     soulBounToken = await SoulBounToken.deploy('NEBULA SBT', 'NSBT', 'https://tokenuri/');
     sbtAddress = await soulBounToken.getAddress();
 
-    await erc721Token.mint(staker1.address); // Mint NFT to staker1
+    await erc721Token.mint(staker1.address, 1, '0x'); // Mint NFT to staker1
     await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
 
     await soulBounToken.grantRole(ADMIN_ROLE, galileoStakingAddress);
@@ -138,10 +138,10 @@ describe('GalileoStaking', async function () {
       // Stake NFT and LEOX
       await galileoStaking.connect(staker1).stake(voucher);
 
-      await erc721Token.mint(staker2.address); // Mint NFT to staker1
+      await erc721Token.mint(staker2.address, 2, '0x'); // Mint NFT to staker1
       await erc20Token.transfer(staker2.address, parseEther('1000')); // Transfer LEOX to staker1
 
-      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      tokenId = 2; // Get the latest tokenId
 
       await erc721Token.connect(staker2).approve(galileoStakingAddress, tokenId);
       await erc20Token.connect(staker2).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -381,13 +381,13 @@ describe('GalileoStaking', async function () {
 
       // Stake NFT and LEOX
 
-      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWithCustomError(erc721Token, 'ERC721IncorrectOwner'); // Specify the expected address in the error
+      await expect(galileoStaking.connect(staker2).stake(voucher)).to.be.revertedWith('Transfer from incorrect owner'); // Specify the expected address in the error
     });
 
     it('Should stake with zero leox', async function () {
       // Mint NFT to staker2
-      await erc721Token.mint(staker2.address);
-      const tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      await erc721Token.mint(staker2.address, 2, '0x');
+      const tokenId = 2; // Get the latest tokenId
 
       const stakeLeoxAmount = parseEther('0');
       const citizen = 1;
@@ -685,8 +685,8 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      await erc721Token.mint(staker2.address); // Mint NFT to staker1
-      tokenId = await erc721Token.totalSupply();
+      await erc721Token.mint(staker2.address, 2, '0x'); // Mint NFT to staker1
+      tokenId = 2;
       await erc20Token.transfer(staker2.address, parseEther('1000')); // Transfer LEOX to staker1
 
       // Approve tokens for transfer
@@ -1163,10 +1163,10 @@ describe('GalileoStaking', async function () {
       // Stake NFT and LEOX
       await galileoStaking.connect(staker1).stake(voucher);
 
-      await erc721Token.mint(staker2.address); // Mint NFT to staker1
+      await erc721Token.mint(staker2.address, 2, '0x'); // Mint NFT to staker1
       await erc20Token.transfer(staker2.address, parseEther('1000')); // Transfer LEOX to staker1
 
-      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      tokenId = 2; // Get the latest tokenId
 
       // Approve tokens for transfer
       await erc721Token.connect(staker2).approve(galileoStakingAddress, tokenId);
@@ -1493,10 +1493,10 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      await erc721Token.mint(staker1.address); // Mint NFT to staker1
+      await erc721Token.mint(staker1.address, 2, '0x'); // Mint NFT to staker1
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
 
-      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      tokenId = 2; // Get the latest tokenId
 
       await erc721Token.connect(staker1).approve(galileoStakingAddress, tokenId);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1653,9 +1653,9 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
-      await erc721Token.mint(staker1.address); // Mint NFT to staker1
+      await erc721Token.mint(staker1.address, 2, '0x'); // Mint NFT to staker1
 
-      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      tokenId = 2; // Get the latest tokenId
 
       await erc721Token.connect(staker1).approve(galileoStakingAddress, tokenId);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
@@ -1681,7 +1681,7 @@ describe('GalileoStaking', async function () {
       const stakerLeoxBalanceAfter = await erc20Token.balanceOf(staker1.address);
 
       const stakerBalance = stakerLeoxBalanceBefore - stakeLeoxAmount; // unstake  nft, it minus the one nft
-      expect(unstake.logs[3].args[4]).to.be.equal(stakeLeoxAmount);
+      expect(unstake.logs[4].args[4]).to.be.equal(stakeLeoxAmount);
       expect(stakerLeoxBalanceAfter).to.be.equal(stakerBalance);
     });
 
@@ -1873,10 +1873,10 @@ describe('GalileoStaking', async function () {
 
       // Stake NFT and LEOX
       await galileoStaking.connect(staker1).stake(voucher);
-      await erc721Token.mint(staker1.address); // Mint NFT to staker1
+      await erc721Token.mint(staker1.address, 2, '0x'); // Mint NFT to staker1
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
 
-      tokenId = await erc721Token.totalSupply(); // Get the latest tokenId
+      tokenId = 2; // Get the latest tokenId
 
       await erc721Token.connect(staker1).approve(galileoStakingAddress, tokenId);
       await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
