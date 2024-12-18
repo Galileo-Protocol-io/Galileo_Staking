@@ -126,15 +126,15 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
   /**
    * @dev Event emitted when a recipient withdraws rewards for a staked NFT
    *
-   * @param collectionAddress Address of the collection the NFT belongs to.
    * @param recipient Address of the recipient who withdraw the rewards
+   * @param collectionAddress Address of the collection the NFT belongs to.
    * @param tokenId The ID of the token to which more tokens are staked.
    * @param rewardAmount Amount of rewards withdrawn.
    * @param currentTime Timestamp of the withdrawal.
    */
   event WithdrawRewards(
-    address indexed collectionAddress,
     address indexed recipient,
+    address indexed collectionAddress,
     uint256 indexed tokenId,
     uint256 rewardAmount,
     uint256 currentTime
@@ -1012,8 +1012,6 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       state.soulboundTokenToCollection[collectionAddress] = soulboundToken;
     }
 
-    uint256 totalSupply = state.erc721Supply[collectionAddress]; // Start with the current total supply
-
     // Loop through the provided staking details
     for (uint256 i = 0; i < stakeInfo.length; i++) {
       if (stakeInfo[i].maxLeox == 0 || stakeInfo[i].yieldTraitPoints == 0) revert GalileoStakingErrors.InvalidInput();
@@ -1037,8 +1035,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
       // Append the new staking info to the existing array for this collection
       state.stakeTokensInfo[collectionAddress].push(newStakeInfo);
     }
-    // Update total supply
-    totalSupply += tokenIdsCount;
+
+    // set the total number of nebula tokens as the total supply
+    uint256 totalSupply = tokenIdsCount;
 
     // Store the updated total supply of the collection (converted to 18 decimals)
     state.erc721Supply[collectionAddress] = totalSupply * PRECISION;
