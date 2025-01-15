@@ -1030,7 +1030,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
 
       // Check that the maxLeox and yieldTraitPoints follow a consistent hierarchy
       if (i > 0) {
-        // Ensure that maxLeox does not decrease compared to the previous tier
+        // Ensure that maxLeox decreases (is in descending order) compared to the previous tier
         if (stakeInfo[i].maxLeox > stakeInfo[i - 1].maxLeox) revert GalileoStakingErrors.InvalidLeoxHierarchy();
 
         // Ensure that yieldTraitPoints do not decrease compared to the previous tier
