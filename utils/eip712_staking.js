@@ -1,17 +1,12 @@
-async function sign(
-  wallet,
-  verifyingContract,
-  collectionAddress,
-  tokenId,
-  citizen,
-) {
+async function sign(wallet, verifyingContract, collectionAddress, tokenId, citizen) {
   try {
+    const chainId = 31337;
     const signingDomain = async () => {
       const domain = {
         name: 'Galileo-Staking',
         version: '1',
         verifyingContract: verifyingContract,
-        chainId: 31337,
+        chainId: chainId,
       };
       return domain;
     };
@@ -23,6 +18,7 @@ async function sign(
         { name: 'collectionAddress', type: 'address' },
         { name: 'tokenId', type: 'uint256' },
         { name: 'citizen', type: 'uint256' },
+        { name: 'chainId', type: 'uint256' },
       ],
     };
 
@@ -30,6 +26,7 @@ async function sign(
       collectionAddress,
       tokenId,
       citizen,
+      chainId,
     };
 
     const signature = await wallet.signTypedData(domain, types, voucher);

@@ -14,7 +14,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
-import "hardhat/console.sol";
 
 contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IERC721Receiver {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -1505,7 +1504,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
         abi.encode(
           keccak256(
             // Define the structure of the typed data for the voucher in EIP-712 format.
-            "GalileoStakeTokens(address collectionAddress,uint256 tokenId,uint256 citizen)"
+            "GalileoStakeTokens(address collectionAddress,uint256 tokenId,uint256 citizen,uint256 chainId)"
           ),
           // Encode the actual data from the `StakeTokens` struct into the hash.
           // Address of the NFT collection.
@@ -1513,7 +1512,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
           // ID of the NFT token being staked.
           stakeTokens.tokenId,
           // ID or address of the citizen in the staking process.
-          stakeTokens.citizen
+          stakeTokens.citizen,
+          // Chainid of the network where the transaction is being executed
+          block.chainid
         )
       )
     );
