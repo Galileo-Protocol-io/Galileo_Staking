@@ -29,7 +29,16 @@ describe('GalileoStaking', async function () {
 
     // Deploy mock ERC20 token
     ERC20Token = await ethers.getContractFactory('QRC20');
-    erc20Token = await ERC20Token.deploy('Leox', 'LEOX', 18, parseEther('10000000000'), admin.address, admin.address, parseEther('10000000000'), true);
+    erc20Token = await ERC20Token.deploy(
+      'Leox',
+      'LEOX',
+      18,
+      parseEther('10000000000'),
+      admin.address,
+      admin.address,
+      parseEther('10000000000'),
+      true
+    );
     leoxAddress = await erc20Token.getAddress();
 
     // Deploy mock ERC721 token
@@ -205,6 +214,66 @@ describe('GalileoStaking', async function () {
       expect(stakedPercentage).to.equal(0);
     });
 
+    it('Should revert if token id is zero', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 0;
+      const citizen = 1;
+
+      const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await expect(galileoStaking.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking, 'InvalidTokenId');
+    });
+
+    it('Should revert if citizen is zero', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 1;
+      const citizen = 0;
+
+      const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await expect(galileoStaking.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking, 'InvalidCitizenIndex');
+    });
+
+    it('Should revert if invalid time', async function () {
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 1;
+      const citizen = 1;
+
+      const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: 0,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await expect(galileoStaking.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking, 'InvalidTime');
+    });
+
     it('Should not allow staking with unapproved NFT or LEOX', async function () {
       const stakeLeoxAmount = parseEther('100');
       let tokenId = 1;
@@ -252,7 +321,7 @@ describe('GalileoStaking', async function () {
       await expect(galileoStaking.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking, 'InvalidAddress');
     });
 
-    it('Should not allow staking with invalid time', async function () {
+    it('Should not allow staking with 0 time', async function () {
       const stakeLeoxAmount = parseEther('100');
       const tokenId = 1;
       const citizen = 1;
@@ -312,6 +381,45 @@ describe('GalileoStaking', async function () {
       };
 
       await expect(galileoStaking1.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking1, 'PoolUninitialized');
+    });
+
+    it('Should not allow staking with uninitialized collection', async function () {
+      const GalileoStaking1 = await ethers.getContractFactory('GalileoStaking');
+      const galileoStaking1 = await GalileoStaking1.deploy(leoxAddress, INCREMENT);
+      const galileoStakingAddress1 = await galileoStaking1.getAddress();
+
+      let currentTime = Math.floor(Date.now() / 1000);
+      const poolInfo = [[nebulaAddress, parseEther('3'), [[rewardRate, currentTime, 0]]]];
+
+      await (await galileoStaking1.connect(admin).configurePool(poolInfo)).wait();
+      const muliplier = [[stakeTime, stakingMultiplier]];
+
+      await (await galileoStaking1.connect(admin).setMultipliers(nebulaAddress, muliplier)).wait();
+
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 1;
+      const citizen = 1;
+
+      await galileoStaking1.connect(admin).grantRole(VALIDATOR_ROLE, admin.address);
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress1, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress1, stakeLeoxAmount);
+      const signature = await sign(admin, galileoStakingAddress1, nebulaAddress, tokenId, citizen, stakeTime, stakeLeoxAmount);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      await expect(galileoStaking1.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(
+        galileoStaking1,
+        'CollectionUninitialized'
+      );
     });
 
     it('Should not allow staking with stake max leox from configured leox', async function () {
@@ -908,6 +1016,13 @@ describe('GalileoStaking', async function () {
       );
     });
 
+    it('Should revert if invalid citizen is configured', async function () {
+      await expect(galileoStaking.getYieldTraitPoints(nebulaAddress, 10)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidCitizenIndex'
+      );
+    });
+
     it('Should revert if collection address is invalid', async function () {
       await expect(galileoStaking.getYieldTraitPoints(ethers.ZeroAddress, 1)).to.be.revertedWithCustomError(
         galileoStaking,
@@ -958,6 +1073,13 @@ describe('GalileoStaking', async function () {
       await expect(galileoStaking.getStakersPosition(nebulaAddress, ethers.ZeroAddress, 1)).to.be.revertedWithCustomError(
         galileoStaking,
         'InvalidAddress'
+      );
+    });
+
+    it('Should revert if token id is invalid', async function () {
+      await expect(galileoStaking.getStakersPosition(staker1.address, nebulaAddress, 0)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidTokenId'
       );
     });
 
@@ -1455,6 +1577,20 @@ describe('GalileoStaking', async function () {
 
       const getRewardTokensCount = await galileoStaking.getRewardPoolBalance(nebulaAddress);
       expect(getRewardTokensCount).to.be.equal(depositRewardTokens);
+    });
+
+    it('Should revert if amount is zero', async function () {
+      await expect(galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('0'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAmount'
+      );
+    });
+
+    it('Should revert if address is zero', async function () {
+      await expect(galileoStaking.connect(admin).depositRewards(ethers.ZeroAddress, parseEther('1000'))).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidAddress'
+      );
     });
 
     it('Should not deposit tokens by non-Admin', async function () {
@@ -1960,6 +2096,14 @@ describe('GalileoStaking', async function () {
         galileoStaking,
         'AccessControlUnauthorizedAccount'
       );
+    });
+  });
+
+  describe('onERC721Received', async function () {
+    it('should return the correct selector', async function () {
+      // Call onERC721Received directly and check the return value
+      const selector = await galileoStaking.onERC721Received.staticCall(admin.address, staker1.address, 1, '0x');
+      expect(selector).to.equal('0x150b7a02');
     });
   });
 });

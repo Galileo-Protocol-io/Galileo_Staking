@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IGalileoSoulBoundToken.sol";
 import "./libraries/GalileoStakingStorage.sol";
 import "./libraries/GalileoStakingErrors.sol";
+import "hardhat/console.sol";
 
 contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IERC721Receiver {
   //  ██████╗  █████╗ ██╗     ██╗██╗     ███████╗  ██████╗
@@ -295,6 +296,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakedLeox The amount of LEOX tokens to be staked alongside the NFT.
    */
   function _stakeTokens(address collectionAddress, uint256 tokenId, uint256 citizen, uint256 timelockEndTime, uint256 stakedLeox) internal {
+    //  This ensures that the token id must not be zero.
+    if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
+
     // Get the address of the user who is calling the function (msg.sender).
     address recipient = _msgSender();
 
@@ -314,7 +318,7 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
     uint256 currentTime = block.timestamp;
 
     // Check if the timelock end time is in the future
-    if (timelockEndTime + currentTime < currentTime) revert GalileoStakingErrors.InvalidTime();
+    if (timelockEndTime + currentTime <= currentTime) revert GalileoStakingErrors.InvalidTime();
 
     // Retrieve pool data for the collection
     GalileoStakingStorage.PoolData storage poolData = state.pools[collectionAddress];
