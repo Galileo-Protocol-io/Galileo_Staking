@@ -602,6 +602,13 @@ describe('GalileoStaking', async function () {
       await galileoStaking.connect(staker1).stakeLeoxTokens(nebulaAddress, 1, parseEther('200'));
     });
 
+    it('Should revert if leox token id is zero', async function () {
+      await expect(galileoStaking.connect(staker1).stakeLeoxTokens(nebulaAddress, 0, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'InvalidTokenId'
+      );
+    });
+
     it('Should revert if collection address is zero address', async function () {
       await expect(galileoStaking.connect(staker1).stakeLeoxTokens(ethers.ZeroAddress, 1, parseEther('200'))).to.be.revertedWithCustomError(
         galileoStaking,

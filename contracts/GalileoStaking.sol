@@ -449,6 +449,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakeMoreLeox The amount of additional LEOX tokens to be staked.
    */
   function stakeLeoxTokens(address collectionAddress, uint256 tokenId, uint256 stakeMoreLeox) external whenNotPaused nonReentrant {
+    //  This ensures that the token id must not be zero.
+    if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
+
     // Get the address of the user who is calling the function (msg.sender).
     address recipient = _msgSender();
 
