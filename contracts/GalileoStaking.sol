@@ -295,6 +295,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakedLeox The amount of LEOX tokens to be staked alongside the NFT.
    */
   function _stakeTokens(address collectionAddress, uint256 tokenId, uint256 citizen, uint256 timelockEndTime, uint256 stakedLeox) internal {
+    // Validate that the emergency is declared yet
+    if (state.isEmergencyDeclared[collectionAddress]) revert GalileoStakingErrors.EmergencyDeclared();
+
     //  This ensures that the token id must not be zero.
     if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
 
@@ -449,6 +452,9 @@ contract GalileoStaking is EIP712, Pausable, AccessControl, ReentrancyGuard, IER
    * @param stakeMoreLeox The amount of additional LEOX tokens to be staked.
    */
   function stakeLeoxTokens(address collectionAddress, uint256 tokenId, uint256 stakeMoreLeox) external whenNotPaused nonReentrant {
+    // Validate that the emergency is declared yet
+    if (state.isEmergencyDeclared[collectionAddress]) revert GalileoStakingErrors.EmergencyDeclared();
+
     //  This ensures that the token id must not be zero.
     if (tokenId == 0) revert GalileoStakingErrors.InvalidTokenId();
 

@@ -214,6 +214,31 @@ describe('GalileoStaking', async function () {
       expect(stakedPercentage).to.equal(0);
     });
 
+    it('Should revert if emergency is declared', async function () {
+      await (await galileoStaking.connect(admin).declareEmergency(nebulaAddress)).wait();
+
+      const stakeLeoxAmount = parseEther('100');
+      const tokenId = 1;
+      const citizen = 1;
+
+      // Approve tokens for transfer
+      await erc721Token.connect(staker1).approve(galileoStakingAddress, 1);
+      await erc20Token.connect(staker1).approve(galileoStakingAddress, stakeLeoxAmount);
+      const signature = await sign(admin, galileoStakingAddress, nebulaAddress, tokenId, citizen);
+
+      const voucher = {
+        collectionAddress: nebulaAddress,
+        tokenId: tokenId,
+        citizen: citizen,
+        timelockEndTime: stakeTime,
+        stakedLeox: stakeLeoxAmount,
+        signature: signature,
+      };
+
+      // Stake NFT and LEOX
+      await expect(galileoStaking.connect(staker1).stake(voucher)).to.be.revertedWithCustomError(galileoStaking, 'EmergencyDeclared');
+    });
+
     it('Should revert if token id is zero', async function () {
       const stakeLeoxAmount = parseEther('100');
       const tokenId = 0;
@@ -600,6 +625,15 @@ describe('GalileoStaking', async function () {
       await erc20Token.connect(staker1).approve(galileoStakingAddress, parseEther('200'));
 
       await galileoStaking.connect(staker1).stakeLeoxTokens(nebulaAddress, 1, parseEther('200'));
+    });
+
+    it('Should revert if leox token id is zero', async function () {
+      await (await galileoStaking.connect(admin).declareEmergency(nebulaAddress)).wait();
+
+      await expect(galileoStaking.connect(staker1).stakeLeoxTokens(nebulaAddress, 1, 1)).to.be.revertedWithCustomError(
+        galileoStaking,
+        'EmergencyDeclared'
+      );
     });
 
     it('Should revert if leox token id is zero', async function () {
@@ -1769,7 +1803,6 @@ describe('GalileoStaking', async function () {
       let tokenId = 1;
       let citizen = 1;
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
-      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
@@ -1819,6 +1852,8 @@ describe('GalileoStaking', async function () {
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
 
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
+
       let unstake = await (await galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 1)).wait();
 
       const stakerLeoxBalanceAfter = await erc20Token.balanceOf(staker1.address);
@@ -1833,7 +1868,6 @@ describe('GalileoStaking', async function () {
       let tokenId = 1;
       let citizen = 1;
       await erc20Token.connect(admin).approve(galileoStakingAddress, parseEther('1000'));
-      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
       await galileoStaking.connect(admin).depositRewards(nebulaAddress, parseEther('1000'));
 
       await erc20Token.transfer(staker1.address, parseEther('1000')); // Transfer LEOX to staker1
@@ -1859,6 +1893,8 @@ describe('GalileoStaking', async function () {
 
       await ethers.provider.send('evm_increaseTime', [stakeTime]);
       await ethers.provider.send('evm_mine');
+
+      await galileoStaking.connect(admin).declareEmergency(nebulaAddress);
 
       await galileoStaking.connect(staker1).emergencyUnstake(nebulaAddress, 1);
 

@@ -81,6 +81,9 @@ library GalileoStakingErrors {
   // Error indicating that an emergency is not declared
   error EmergencyNotDeclared();
 
+  // Error indicating that an emergency is  declared
+  error EmergencyDeclared();
+
   // Error indicating that the emergency state is the same as the current state
   error StateAlreadyDeclared();
 }
